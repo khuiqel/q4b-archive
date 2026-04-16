@@ -1,0 +1,21 @@
+[submodule "Externals/SDL"]
+	path = Externals/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "Externals/imgui"]
+	path = Externals/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "Externals/googletest"]
+	path = Externals/googletest
+	url = https://github.com/google/googletest.git
+[submodule "Externals/cpp-optparse"]
+	path = Externals/cpp-optparse
+	url = https://github.com/weisslj/cpp-optparse.git
+[submodule "Externals/xxHash"]
+	path = Externals/xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+[submodule "Externals/zstd"]
+	path = Externals/zstd
+	url = https://github.com/facebook/zstd.git
+[submodule "Externals/lz4"]
+	path = Externals/lz4
+	url = https://github.com/lz4/lz4.git
