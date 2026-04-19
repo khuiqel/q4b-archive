@@ -15,7 +15,18 @@ ArchiveHeader::ArchiveHeader() {
 	flags = 0;
 	version = Q4B_ARCHIVE_VERSION;
 	num_files = 0;
-	self_hash = 0; //TODO
+	self_hash = 0; // Exists to make sure the header isn't corrupted
+}
+
+void ArchiveHeader::computeHash() {
+	self_hash = 0;
+	self_hash = ComputeHash(this, sizeof(*this));
+}
+
+bool ArchiveHeader::verifyHash() const {
+	ArchiveHeader copied(*this);
+	copied.computeHash();
+	return copied.self_hash == this->self_hash;
 }
 
 
@@ -67,16 +78,16 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 		switch (file.compression_type) {
 			default:
 				std::cerr << "ERROR: Unknown compression: " << (int64_t)file.compression_type << std::endl;
-				file_header.compression_type = CompressionFormat::Uncompressed;
+				file_header.compression_type = CompressionScheme::Uncompressed;
 				[[fallthrough]];
-			case CompressionFormat::Uncompressed: {
+			case CompressionScheme::Uncompressed: {
 				compressed_files_data[i] = file_data;
 				file_header.compressed_size = file_header.uncompressed_size;
 				file_header.compressed_hash = file_header.uncompressed_hash;
 				break;
 			}
 
-			case CompressionFormat::zstd: {
+			case CompressionScheme::zstd: {
 				size_t compressed_size = CompressZstdData(file_data, file_header.uncompressed_size, file.compression_level, &(compressed_files_data[i]));
 				file_header.compressed_size = compressed_size;
 				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
@@ -85,7 +96,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 				break;
 			}
 
-			case CompressionFormat::lz4: {
+			case CompressionScheme::lz4: {
 				size_t compressed_size = CompressLz4Data(file_data, file_header.uncompressed_size, file.compression_level, &(compressed_files_data[i]));
 				file_header.compressed_size = compressed_size;
 				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
@@ -99,7 +110,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 
 	ArchiveHeader ah;
 	ah.num_files = file_list.size();
-	//TODO: hash
+	ah.computeHash();
 	outfile.write((const char*)&ah, sizeof(ah));
 
 	for (const ArchivedFileHeader& fh : compressed_files_headers) {
@@ -143,7 +154,10 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		delete[] archive;
 		return;
 	}
-	//TODO: hash
+	if (!ah.verifyHash()) {
+		std::cout << "hash didn't match on header\n";
+		//return;
+	}
 	// if (ah.version <= 0) { return; } //TODO: versioning
 
 	std::vector<char*> compressed_files_data(ah.num_files);
@@ -199,7 +213,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 			default:
 				std::cerr << "ERROR: Unknown compression: " << (int64_t)file_header.compression_type << std::endl;
 				[[fallthrough]];
-			case CompressionFormat::Uncompressed: {
+			case CompressionScheme::Uncompressed: {
 				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
 				outfile.write((const char*)compressed_files_data[i], file_header.compressed_size);
 				outfile.close();
@@ -207,7 +221,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				break;
 			}
 
-			case CompressionFormat::zstd: {
+			case CompressionScheme::zstd: {
 				char* decompressed_file;
 				size_t decompressed_size = UncompressZstdData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
 				if (decompressed_size != file_header.uncompressed_size) {
@@ -220,7 +234,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				break;
 			}
 
-			case CompressionFormat::lz4: {
+			case CompressionScheme::lz4: {
 				char* decompressed_file;
 				size_t decompressed_size = UncompressLz4Data(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
 				if (decompressed_size != file_header.uncompressed_size) {

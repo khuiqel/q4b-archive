@@ -5,7 +5,7 @@
  *
  * There are only so many ways to make a good file format, so it looks very similar because it
  * is very similar.
- * The CompressionFormat enum was explicitly matched though, to make hypothetical future
+ * The CompressionScheme enum was explicitly matched though, to make hypothetical future
  * compatibility easier.
  */
 
@@ -15,12 +15,13 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 
 #include <xxhash.h>
 
 namespace q4b {
 
-constexpr inline uint32_t Q4B_VERSION_GEN(int major, int minor) {
+inline constexpr uint32_t Q4B_VERSION_GEN(int major, int minor) {
 	return major*1000 + minor;
 }
 
@@ -28,7 +29,7 @@ constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 0);
 constexpr int Q4B_MAX_PATH = 256;
 constexpr char MAGIC_NUM[8] = "Q4B_YAY";
 
-enum class CompressionFormat : uint64_t {
+enum class CompressionScheme : uint64_t {
 	Uncompressed = 0,
 	lz4,
 	zstd,
@@ -45,19 +46,19 @@ enum class CompressionFormat : uint64_t {
 	CountExtraEnd,
 };
 
-inline const char* CompressionToStr(CompressionFormat c) {
+inline const char* CompressionToStr(CompressionScheme c) {
 	switch (c) {
 		default: return "Unknown";
 
-		case CompressionFormat::Uncompressed: return "Uncompressed";
-		case CompressionFormat::lz4:          return "lz4";
-		case CompressionFormat::zstd:         return "zstd";
-		case CompressionFormat::zstd_dict:    return "zstd_dict";
+		case CompressionScheme::Uncompressed: return "Uncompressed";
+		case CompressionScheme::lz4:          return "lz4";
+		case CompressionScheme::zstd:         return "zstd";
+		case CompressionScheme::zstd_dict:    return "zstd_dict";
 
-		// case CompressionFormat::brotli:       return "brotli";
-		// case CompressionFormat::lzma:         return "lzma";
-		// case CompressionFormat::bzip2:        return "bzip2";
-		// case CompressionFormat::miniz:        return "miniz";
+		// case CompressionScheme::brotli:       return "brotli";
+		// case CompressionScheme::lzma:         return "lzma";
+		// case CompressionScheme::bzip2:        return "bzip2";
+		// case CompressionScheme::miniz:        return "miniz";
 	}
 }
 
@@ -74,12 +75,15 @@ struct ArchiveHeader {
 	XXH64_hash_t self_hash;
 
 	ArchiveHeader();
+	void computeHash(); // Call after creating!
+	bool verifyHash() const;
 };
 static_assert(sizeof(ArchiveHeader) == (8+4+4+8+8));
+static_assert(std::is_trivially_copyable<ArchiveHeader>::value);
 
 struct ArchivedFileHeader {
 	char path[Q4B_MAX_PATH];
-	CompressionFormat compression_type;
+	CompressionScheme compression_type;
 	uint64_t compressed_size;
 	uint64_t uncompressed_size;
 	//uint64_t offset; //TODO: offset from start of archive to compressed data
@@ -87,13 +91,14 @@ struct ArchivedFileHeader {
 	XXH64_hash_t uncompressed_hash;
 };
 static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+8+8+8+8+8));
+static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
 //TODO: remember to dump in LE!
 
 //note: this is for the application, the previous one is for the archive
 struct CompressionFile {
 	std::filesystem::path filepath;
-	CompressionFormat compression_type;
+	CompressionScheme compression_type;
 	int32_t compression_level;
 	int32_t compression_flags; //TODO
 
@@ -101,10 +106,6 @@ struct CompressionFile {
 		// This function exists because MSVC doesn't know how to convert std::filesystem::path::c_str() to a C-str
 		return (const char*) filepath.string().c_str();
 	}
-
-	// CompressionFile() { filepath=""; compression_type=CompressionFormat::Uncompressed; compression_level=0; compression_flags=0; }
-	// CompressionFile(std::filesystem::path filepath, CompressionFormat compression_type, int32_t compression_level, int32_t compression_flags) :
-	// 	filepath(filepath), compression_type(compression_type), compression_level(compression_level), compression_flags(compression_flags) {}
 };
 
 

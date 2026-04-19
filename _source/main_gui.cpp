@@ -464,7 +464,7 @@ int main(int argc, char** argv)
 		SDL_SetWindowIcon(window, icon);
 		SDL_DestroySurface(icon);
 	}
-	FILE_LIST.push_back({ argv[0], q4b::CompressionFormat::zstd, 3, 1 });
+	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3, 1 });
 
     // Main loop
     bool done = false;
@@ -495,7 +495,7 @@ int main(int argc, char** argv)
 						//TODO
 						std::string path = std::string(event.drop.data);
 						std::replace(path.begin(), path.end(), '\\', '/');
-						FILE_LIST.push_back({ path, (q4b::CompressionFormat)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
+						FILE_LIST.push_back({ path, (q4b::CompressionScheme)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
 					} else {
 						printf("Not a file: %s\n", event.drop.data);
 					}
@@ -598,7 +598,7 @@ int main(int argc, char** argv)
 					q4b::ExistencePrune(FILE_LIST);
 				}
 
-				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionFormat)0), q4b::CompressionToStr((q4b::CompressionFormat)1), q4b::CompressionToStr((q4b::CompressionFormat)2) };
+				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
 				ImGui::Combo("Compression Format", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
 				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
 				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
