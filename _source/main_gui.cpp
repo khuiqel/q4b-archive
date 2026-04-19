@@ -619,6 +619,23 @@ int main(int argc, char** argv)
 				if (ImGui::Button("Decode archive.q4b")) {
 					q4b::DecodeArchive("archive.q4b", "output");
 				}
+				if (ImGui::Button("Read header of archive.q4b")) {
+					gdata.viewingArchiveFileList.clear();
+					q4b::ReadArchiveHeader("archive.q4b", gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
+					std::cout << gdata.viewingArchiveHeader.magic << " "
+					          << gdata.viewingArchiveHeader.flags << " "
+					          << gdata.viewingArchiveHeader.version << " "
+					          << gdata.viewingArchiveHeader.num_files << " "
+					          << gdata.viewingArchiveHeader.self_hash << std::endl;
+					for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
+						std::cout << file_header.path << " "
+						          << q4b::CompressionToStr(file_header.compression_type) << " "
+						          << file_header.compressed_size << " "
+						          << file_header.uncompressed_size << " "
+						          << file_header.compressed_hash << " "
+						          << file_header.uncompressed_hash << std::endl;
+					}
+				}
 
 				ImGui::EndTabItem();
 			}

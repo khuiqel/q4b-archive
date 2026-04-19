@@ -259,6 +259,33 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 	delete[] archive;
 }
 
+bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header, std::vector<ArchivedFileHeader>& list) noexcept {
+	size_t archive_size = std::filesystem::file_size(input);
+	if (archive_size < sizeof(ArchiveHeader)) {
+		return false;
+	}
+
+	const char* archive = LoadFileIntoMemory(input); //TODO: no need to load the entire file...
+	std::memcpy(&header, archive, sizeof(ArchiveHeader));
+
+	size_t file_offset = sizeof(ArchiveHeader);
+	for (int i = 0; i < header.num_files; i++) {
+		if (archive_size < file_offset + sizeof(ArchivedFileHeader)) {
+			delete[] archive;
+			std::cout << "insufficient size for headers\n";
+			return false;
+		}
+
+		ArchivedFileHeader file_header;
+		std::memcpy(&file_header, archive + file_offset, sizeof(ArchivedFileHeader));
+		list.push_back(file_header);
+		file_offset += sizeof(ArchivedFileHeader);
+	}
+
+	delete[] archive;
+	return true;
+}
+
 char* LoadFileIntoMemory(const std::filesystem::path& filepath) noexcept {
 	uintmax_t uncompressedSize = std::filesystem::file_size(filepath);
 	char* buffer = new char[uncompressedSize];

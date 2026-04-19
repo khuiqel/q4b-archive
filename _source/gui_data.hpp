@@ -1,8 +1,17 @@
 #pragma once
 #include <vector>
 #include <imgui.h>
+#include "q4b.hpp"
 
 struct GuiData {
+	// Archive stuff
+
+	bool viewingArchive = false;
+	q4b::ArchiveHeader viewingArchiveHeader;
+	std::vector<q4b::ArchivedFileHeader> viewingArchiveFileList;
+
+	// Compressing files
+
 	int compression_type_idx = 2;
 
 	int zstd_level_idx;
@@ -14,6 +23,7 @@ struct GuiData {
 	static std::vector<int> lz4_level_num;
 
 	static void InitializeArrays();
+
 	GuiData();
 };
 

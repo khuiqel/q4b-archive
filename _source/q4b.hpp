@@ -144,6 +144,16 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
  */
 void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept;
 
+/* Reads the header of a Q4B archive.
+ *
+ * @param input [in] Name of the archive.
+ * @param header [in,out] Where to put the archive's header.
+ * @param list [in,out] Where to put the archive's list of files.
+ *
+ * @return True on success, false on failure.
+ */
+bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header, std::vector<ArchivedFileHeader>& list) noexcept;
+
 /* Loads a file into memory. Returns the pointer to the allocated memory.
  *
  * @param filepath [in] The file to load.
