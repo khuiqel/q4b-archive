@@ -493,7 +493,9 @@ int main(int argc, char** argv)
 				case SDL_EVENT_DROP_FILE:
 					if (std::filesystem::exists(event.drop.data)) [[likely]] {
 						//TODO
-						FILE_LIST.push_back({ event.drop.data, (q4b::CompressionFormat)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
+						std::string path = std::string(event.drop.data);
+						std::replace(path.begin(), path.end(), '\\', '/');
+						FILE_LIST.push_back({ path, (q4b::CompressionFormat)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
 					} else {
 						printf("Not a file: %s\n", event.drop.data);
 					}

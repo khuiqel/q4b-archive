@@ -58,7 +58,8 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 		char* file_data = LoadFileIntoMemory(file.filepath);
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		strncpy(file_header.path, (const char*)file.filepath.c_str(), sizeof(file_header.path)-1);
+		strncpy(file_header.path, (const char*)file.getFilepath(), sizeof(file_header.path)-1);
+		std::replace(file_header.path, file_header.path + sizeof(file_header.path), '\\', '/');
 		file_header.compression_type = file.compression_type;
 		file_header.uncompressed_size = std::filesystem::file_size(file.filepath);
 		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);

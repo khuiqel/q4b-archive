@@ -99,7 +99,7 @@ struct CompressionFile {
 
 	inline const char* getFilepath() const {
 		// This function exists because MSVC doesn't know how to convert std::filesystem::path::c_str() to a C-str
-		return (const char*) filepath.c_str();
+		return (const char*) filepath.string().c_str();
 	}
 
 	// CompressionFile() { filepath=""; compression_type=CompressionFormat::Uncompressed; compression_level=0; compression_flags=0; }
