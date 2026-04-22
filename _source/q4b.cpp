@@ -66,13 +66,17 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 
 	for (int i = 0; i < file_list.size(); i++) {
 		const CompressionFile& file = file_list[i];
-		char* file_data = LoadFileIntoMemory(file.filepath);
+		char* file_data;
+		int64_t file_size = LoadFileIntoMemory(file.filepath, &file_data);
+		if (file_size == -1) {
+			//TODO
+		}
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		strncpy(file_header.path, (const char*)file.getFilepath(), sizeof(file_header.path)-1);
+		strncpy(file_header.path, file.getFilepath(), sizeof(file_header.path)-1);
 		std::replace(file_header.path, file_header.path + sizeof(file_header.path), '\\', '/');
 		file_header.compression_type = file.compression_type;
-		file_header.uncompressed_size = std::filesystem::file_size(file.filepath);
+		file_header.uncompressed_size = file_size;
 		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
 
 		switch (file.compression_type) {
@@ -143,7 +147,12 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		return;
 	}
 
-	const char* archive = LoadFileIntoMemory(input); //TODO: handle the case where the filesize changes
+	char* archive;
+	int64_t file_size = LoadFileIntoMemory(input, &archive);
+	if (file_size == -1) {
+		//TODO
+	}
+
 	ArchiveHeader ah;
 	std::memcpy(&ah, archive, sizeof(ArchiveHeader));
 	if (!std::equal(ah.magic, ah.magic + sizeof(ah.magic), MAGIC_NUM)) {
@@ -265,7 +274,15 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 		return false;
 	}
 
-	const char* archive = LoadFileIntoMemory(input); //TODO: no need to load the entire file...
+	char* archive;
+	int64_t file_size = LoadFileIntoMemory(input, &archive); //TODO: no need to load the entire file...
+	if (file_size == -1) {
+		//TODO
+	}
+	if (file_size < sizeof(ArchiveHeader)) {
+		delete[] archive;
+		return false;
+	}
 	std::memcpy(&header, archive, sizeof(ArchiveHeader));
 
 	size_t file_offset = sizeof(ArchiveHeader);
@@ -286,20 +303,42 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 	return true;
 }
 
-char* LoadFileIntoMemory(const std::filesystem::path& filepath) noexcept {
-	uintmax_t uncompressedSize = std::filesystem::file_size(filepath);
-	char* buffer = new char[uncompressedSize];
-
-	std::ifstream file(filepath, std::ios::binary);
-	if (file) {
-		file.read(buffer, uncompressedSize);
-		file.close();
-		return buffer;
-	} else {
-		//TODO
-		std::cerr << "error\n";
-		return nullptr;
+int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept {
+	// Open file (at the end)
+	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+	if (!file) {
+		return -1;
 	}
+
+	// Get file size: don't use std::filesystem::file_size because the size *could* change
+	// file.seekg(0, std::ios::end); // Not needed because the file was opened at the end
+	int64_t fileSize = file.tellg();
+	if (fileSize == -1) {
+		return -1;
+	}
+	file.seekg(0, std::ios::beg);
+	if (!file) {
+		return -1;
+	}
+
+	// Read
+	char* buffer = new char[fileSize];
+	file.read(buffer, fileSize);
+	if (!file) {
+		delete[] buffer;
+		return -1;
+	}
+
+	// Return
+	int64_t bytesRead = file.gcount();
+	if (bytesRead != fileSize) {
+		delete[] buffer;
+		return -1;
+	}
+	*dest = buffer;
+	return bytesRead;
+
+	// No need to call file.close() because fstream destructors close automatically
 }
 
 //TODO: compressing without making the frame needs a context

@@ -157,10 +157,11 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 /* Loads a file into memory. Returns the pointer to the allocated memory.
  *
  * @param filepath [in] The file to load.
+ * @param dest [out] The pointer for where the file will be put, allocated using `new[]`. Will not be set on error.
  *
- * @return Pointer to the allocated memory, allocated using `new[]`.
+ * @return Size of the file. -1 if error. If the full file couldn't be loaded, returns -1.
  */
-[[nodiscard]] char* LoadFileIntoMemory(const std::filesystem::path& filepath) noexcept;
+[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept;
 
 /* Compresses data in memory using Zstd. Returns the size of the compressed data, as a Zstd block (meaning no metadata). (TODO: for now it's a frame, so there is metadata)
  *
