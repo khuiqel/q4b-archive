@@ -53,10 +53,10 @@ std::vector<CompressionFile> GetFileListSortedBySize(const std::vector<Compressi
 
 
 
-//TODO: this should write to a tempfile then copy that to the real file if it succeeds
 //TODO: should this make sure there are no duplicates?
 void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& output) noexcept {
-	std::ofstream outfile(output, std::ios::binary);
+	const std::filesystem::path output_tmp = output.string() + ".tmp";
+	std::ofstream outfile(output_tmp, std::ios::binary);
 	if (!outfile) {
 		return;
 	}
@@ -126,7 +126,13 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	}
 
 	outfile.close();
-	std::cout << "wrote .q4b\n";
+	std::error_code ec;
+	std::filesystem::rename(output_tmp, output, ec);
+	if (ec) {
+		std::filesystem::remove(output_tmp);
+	} else {
+		// std::cout << "wrote .q4b\n";
+	}
 
 	for (int i = 0; i < file_list.size(); i++) {
 		delete[] compressed_files_data[i];
