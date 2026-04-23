@@ -32,7 +32,6 @@ Compiling:
 
 * GUI: `cmake --build build -j$(nproc) --target q4b-gui`
 * CLI: `cmake --build build -j$(nproc) --target q4b`
-* Both: `cmake --build build -j$(nproc)`
 
 Running:
 
@@ -59,6 +58,18 @@ Compiling using Visual Studio:
 1. Set build type to "Release"
 1. Build `q4b-gui` and/or `q4b`
 1. Run (press F5 or Ctrl+F5); defaults to `q4b-gui`, so if you want to run `q4b`, right click its Project and select "Set as Startup Project"
+
+## Running the tests
+
+Linux:
+
+* Compile: `cmake --build build -j$(nproc) --target q4b-tests`
+* Run: `./build/q4b-tests`
+
+Windows:
+
+* CMake: `cmake --build build --config Release --target q4b-tests` & `"build/Release/q4b-tests.exe"`
+* Visual Studio: Build `q4b-tests` then run it
 
 ## Stuff that works
 

@@ -136,3 +136,29 @@ endif()
 target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static)
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static)
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3 ${Vulkan_LIBRARIES})
+
+# Tests!
+
+enable_testing()
+set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
+
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+add_subdirectory(Externals/googletest)
+
+add_executable(${PROJECT_TESTS_NAME}
+	tests/archive.cpp
+
+	_source/q4b.cpp
+
+	Externals/xxHash/xxhash.c
+)
+
+if (MSVC)
+	set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+endif()
+
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE libzstd_static lz4_static)
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
+
+include(GoogleTest)
+gtest_discover_tests(${PROJECT_TESTS_NAME})
