@@ -83,4 +83,69 @@ TEST(WriteArchive, TwoFilesCompressedZstd) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
+TEST(ArchiveStructs, SetPath) {
+	q4b::ArchivedFileHeader file_header;
+	file_header.setPath("a");
+
+	ASSERT_TRUE(file_header.path[0] == 'a');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
+
+	bool allZeros = true;
+	for (int i = 1; i < q4b::Q4B_MAX_PATH-1; i++) {
+		if (file_header.path[i] != '\0') {
+			allZeros = false;
+			break;
+		}
+	}
+	EXPECT_TRUE(allZeros);
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[q4b::Q4B_MAX_PATH-2] = 'a';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, SetPathLong) {
+	q4b::ArchivedFileHeader file_header;
+
+	std::string longPath = "";
+	constexpr int longPathLength = 300;
+	static_assert(longPathLength > q4b::Q4B_MAX_PATH);
+
+	for (int i = 0; i < longPathLength; i++) {
+		longPath += "a";
+	}
+	file_header.setPath(longPath);
+
+	ASSERT_TRUE(file_header.path[0] == 'a');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-2] == 'a');
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[q4b::Q4B_MAX_PATH-1] = 'a';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, SetPathBackslash) {
+	q4b::ArchivedFileHeader file_header;
+
+	std::string backslashPath = TEST_FILE.string();
+	std::replace(backslashPath.begin(), backslashPath.end(), '/', '\\');
+	file_header.setPath(backslashPath);
+
+	ASSERT_TRUE(file_header.path[0] != '\0');
+
+	bool backslashPresent = false;
+	for (int i = 0; i < q4b::Q4B_MAX_PATH; i++) {
+		if (file_header.path[i] == '\\') {
+			backslashPresent = true;
+			break;
+		}
+	}
+	EXPECT_FALSE(backslashPresent);
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[0] = '\\';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
 } // namespace

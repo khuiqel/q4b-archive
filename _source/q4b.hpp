@@ -89,6 +89,10 @@ struct ArchivedFileHeader {
 	//uint64_t offset; //TODO: offset from start of archive to compressed data
 	XXH64_hash_t compressed_hash;
 	XXH64_hash_t uncompressed_hash;
+	//TODO: self_hash?
+
+	bool pathIsValid() const; // Returns true for: 1. no backslashes; 2. last byte in array is \0 (to be able to make it a string); 3. end of string to end of array is \0 //TODO: another function to check for NTFS-invalid characters
+	void setPath(const std::filesystem::path& path); // Writes the path, replacing backslashes and filling the remainder of the array with \0
 };
 static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+8+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);

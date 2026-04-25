@@ -2,7 +2,7 @@
 
 #include <fstream>
 #include <iostream>
-#include <cstring> //memcpy, strncpy?
+#include <cstring> //memcpy
 
 #include <zstd.h>
 #include <lz4.h>
@@ -27,6 +27,34 @@ bool ArchiveHeader::verifyHash() const {
 	ArchiveHeader copied(*this);
 	copied.computeHash();
 	return copied.self_hash == this->self_hash;
+}
+
+bool ArchivedFileHeader::pathIsValid() const {
+	// No backslashes
+	if (std::find(path, path + Q4B_MAX_PATH, '\\') != (path + Q4B_MAX_PATH)) {
+		return false;
+	}
+
+	// It can be made into a string
+	if (path[Q4B_MAX_PATH-1] != '\0') {
+		return false;
+	}
+
+	// Rest of array is filled with zero
+	uint32_t firstZero = std::find(path, path + Q4B_MAX_PATH, 0) - path;
+	if (!std::all_of(path + firstZero, path + Q4B_MAX_PATH, [](auto val) { return val == 0; })) {
+		return false;
+	}
+
+	return true;
+};
+
+void ArchivedFileHeader::setPath(const std::filesystem::path& path) {
+	const std::string p = path.string();
+	size_t charCount = std::min(p.size(), size_t(Q4B_MAX_PATH-1));
+	std::copy(p.begin(), p.begin() + charCount, this->path);
+	std::replace(this->path, this->path + charCount, '\\', '/');
+	std::fill(this->path + charCount, this->path + Q4B_MAX_PATH, '\0');
 }
 
 
@@ -73,8 +101,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 		}
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		strncpy(file_header.path, file.getFilepath(), sizeof(file_header.path)-1);
-		std::replace(file_header.path, file_header.path + sizeof(file_header.path), '\\', '/');
+		file_header.setPath(file.filepath);
 		file_header.compression_type = file.compression_type;
 		file_header.uncompressed_size = file_size;
 		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
