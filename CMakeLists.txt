@@ -40,7 +40,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMPILER_MARCH_FLAGS}")
 # SDL configuration
 set(SDL_AUDIO    OFF CACHE BOOL "" FORCE)
 set(SDL_VIDEO    ON  CACHE BOOL "" FORCE)
-set(SDL_GPU      ON  CACHE BOOL "" FORCE) # Needed by ImGui
+set(SDL_GPU      OFF CACHE BOOL "" FORCE) # Needed by ImGui (for GPU-accelerated backends)
 set(SDL_RENDER   ON  CACHE BOOL "" FORCE)
 set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
 set(SDL_JOYSTICK OFF CACHE BOOL "" FORCE) # Needed by ImGui if enabling gamepad navigation
@@ -67,13 +67,6 @@ set(ZSTD_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # Just in case
 
-if (WIN32)
-	find_package(Vulkan REQUIRED)
-	include_directories(${Vulkan_INCLUDE_DIRS})
-else()
-	# TODO: does MSYS2 need this?
-	find_package(Vulkan REQUIRED)
-endif()
 add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(Externals/zstd/build/cmake)
 add_subdirectory(Externals/lz4/build/cmake)
@@ -116,7 +109,7 @@ add_executable(${PROJECT_GUI_NAME}
 	Externals/imgui/imgui_tables.cpp
 	Externals/imgui/imgui_widgets.cpp
 	Externals/imgui/backends/imgui_impl_sdl3.cpp
-	Externals/imgui/backends/imgui_impl_vulkan.cpp
+	Externals/imgui/backends/imgui_impl_sdlrenderer3.cpp
 )
 
 #TODO: is MSVC+Clang a special case?
@@ -135,7 +128,7 @@ endif()
 
 target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static)
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static)
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3 ${Vulkan_LIBRARIES})
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3)
 
 # Tests!
 

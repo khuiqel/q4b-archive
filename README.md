@@ -16,10 +16,9 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 
 ## Building
 
-0. Prerequisites: a compiler with C++23 support, CMake >=3.20, Vulkan
+0. Prerequisites: a compiler with C++23 support, CMake >=3.20
 	* Linux: install [SDL dependencies](https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md)
-	* Windows: download the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows)
-	* Only uses SDL's Video, GPU, and Render subsystems; Joystick can be enabled if you want to use a gamepad to navigate the GUI.
+	* Only uses SDL's Video and Render subsystems; Joystick can be enabled if you want to use a gamepad to navigate the GUI. GPU is not needed.
 	* The `CMakeLists.txt` file sets the instruction set to SSE4.2 by default. If your CPU doesn't have that, change it.
 	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier.
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>`)
@@ -84,6 +83,7 @@ Windows:
 ## Unordered TODO list
 
 * SDL: drop files only in the box (instead of the entire window)
+* fix monitor scaling not changing window size (seems to be an ImGui issue with SDL3)
 * *robustness*
 * force Endianness when creating/decoding archives
 * benchmarks to make graph for compression level vs time vs space
@@ -91,17 +91,6 @@ Windows:
 * much other stuff
 * P3A compatibility mode?
 * set git submodules to shallow
-
-## System Requirements
-
-Windows:
-
-* OS: Windows 10 x86-64
-* GPU: Vulkan compatible
-
-Linux:
-
-* GPU: Vulkan compatible
 
 ## Contributing
 
