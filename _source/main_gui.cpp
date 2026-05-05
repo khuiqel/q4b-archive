@@ -23,6 +23,22 @@
 GuiData gdata;
 std::vector<q4b::CompressionFile> FILE_LIST;
 
+auto filepathCleaningFunc = [] (ImGuiInputTextCallbackData* data) {
+	if (data->EventChar == '\\') {
+		data->EventChar = '/';
+	}
+	else if (data->EventChar == '*'  ||
+	         data->EventChar == '\"' ||
+	         data->EventChar == '?'  ||
+	         data->EventChar == '<'  ||
+	         data->EventChar == '>'  ||
+	         data->EventChar == '|')
+		{ return 1; }
+	return 0;
+};
+
+char root_file_path[1024];
+
 // Main code
 int main(int argc, char** argv)
 {
@@ -101,10 +117,17 @@ int main(int argc, char** argv)
     bool show_demo_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+	// Window icon
 	{
 		SDL_Surface* icon = SDL_LoadPNG("res/q4b-favicon.png");
 		SDL_SetWindowIcon(window, icon);
 		SDL_DestroySurface(icon);
+	}
+
+	// Root folder for relative paths
+	{
+		std::string root_folder = std::filesystem::current_path().generic_string(); // .generic_string() converts slashes on Windows
+		strncpy(root_file_path, root_folder.c_str(), root_folder.size());
 	}
 	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3, 1 });
 
@@ -135,9 +158,8 @@ int main(int argc, char** argv)
 				case SDL_EVENT_DROP_FILE:
 					if (std::filesystem::exists(event.drop.data)) [[likely]] {
 						//TODO
-						std::string path = std::string(event.drop.data);
-						std::replace(path.begin(), path.end(), '\\', '/');
-						FILE_LIST.push_back({ path, (q4b::CompressionScheme)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
+						std::filesystem::path path(event.drop.data);
+						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
 					} else {
 						printf("Not a file: %s\n", event.drop.data);
 					}
@@ -223,7 +245,8 @@ int main(int argc, char** argv)
 						selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
 					ImGui::EndTable();
 				}
-				//TODO: option to set what the root path is (for generating the relative filepaths)
+
+				ImGui::InputText("Root folder", root_file_path, IM_COUNTOF(root_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
 
 				if (ImGui::Button("Prune Existence")) {
 					q4b::ExistencePrune(FILE_LIST);
