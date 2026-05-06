@@ -57,7 +57,7 @@ int main(int argc, char** argv)
     // Create window with SDL_Renderer graphics context
     float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL3+SDL_Renderer example", (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
+    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL3+SDL_Renderer example", (int)(1600 * main_scale), (int)(1000 * main_scale), window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -192,6 +192,7 @@ int main(int argc, char** argv)
 				selection.UserData = (void*)&FILE_LIST;
 				selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
 
+				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
 				const int ITEMS_COUNT = FILE_LIST.size();
 				ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
 				if (ImGui::BeginTable("Selection", 4, table_flags, ImVec2(0.0f, ImGui::GetFontSize() * 20)))
@@ -210,33 +211,26 @@ int main(int argc, char** argv)
 					const bool want_delete = ImGui::Shortcut(ImGuiKey_Delete, ImGuiInputFlags_Repeat) && (selection.Size > 0);
 					const int item_curr_idx_to_focus = want_delete ? selection.ApplyDeletionPreLoop(ms_io, ITEMS_COUNT) : -1;
 
-					ImGuiListClipper clipper;
-					clipper.Begin(ITEMS_COUNT);
-					if (ms_io->RangeSrcItem != -1)
-						clipper.IncludeItemByIndex((int)ms_io->RangeSrcItem); // Ensure RangeSrc item is not clipped.
-					while (clipper.Step())
+					for (int n = 0; n < ITEMS_COUNT; n++)
 					{
-						for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; n++)
-						{
-							ImGui::TableNextRow();
-							ImGui::TableNextColumn();
-							ImGui::PushID(n);
-							bool item_is_selected = selection.Contains((ImGuiID)n);
-							ImGui::SetNextItemSelectionUserData(n);
-							ImGui::Selectable(FILE_LIST[n].getFilepath(), &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
-							if (item_curr_idx_to_focus == n)
-								ImGui::SetKeyboardFocusHere(-1);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::PushID(n);
+						bool item_is_selected = selection.Contains((ImGuiID)n);
+						ImGui::SetNextItemSelectionUserData(n);
+						ImGui::Selectable(FILE_LIST[n].getFilepath(), &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
+						if (item_curr_idx_to_focus == n)
+							ImGui::SetKeyboardFocusHere(-1);
 
-							ImGui::TableNextColumn();
-							ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].compression_type));
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].compression_type));
 
-							ImGui::TableNextColumn();
-							ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
 
-							ImGui::TableNextColumn();
-							ImGui::CheckboxFlags(("##" + std::to_string(n)).c_str(), &FILE_LIST[n].compression_flags, 1);
-							ImGui::PopID();
-						}
+						ImGui::TableNextColumn();
+						ImGui::CheckboxFlags(("##" + std::to_string(n)).c_str(), &FILE_LIST[n].compression_flags, 1);
+						ImGui::PopID();
 					}
 
 					ms_io = ImGui::EndMultiSelect();
@@ -246,17 +240,39 @@ int main(int argc, char** argv)
 					ImGui::EndTable();
 				}
 
+				ImGui::SeparatorText("Change");
+				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
+				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
+				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
+				if (ImGui::Button("Change Files")) {
+					for (int i = 0; i < ITEMS_COUNT; i++) {
+						if (selection.Contains((ImGuiID)i)) {
+							FILE_LIST[i].compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
+							switch (FILE_LIST[i].compression_type) {
+								default: [[fallthrough]];
+								case q4b::CompressionScheme::Uncompressed:
+									//nothing?
+									break;
+
+								case q4b::CompressionScheme::zstd:
+									FILE_LIST[i].compression_level = GuiData::zstd_level_num[gdata.zstd_level_idx];
+									break;
+								case q4b::CompressionScheme::lz4:
+									FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
+									break;
+							}
+						}
+					}
+				}
+
+				ImGui::SeparatorText("Configuration");
 				ImGui::InputText("Root folder", root_file_path, IM_COUNTOF(root_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
 
 				if (ImGui::Button("Prune Existence")) {
 					q4b::ExistencePrune(FILE_LIST);
 				}
 
-				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
-				ImGui::Combo("Compression Format", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
-				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
-				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
-
+				ImGui::SeparatorText("Create");
 				if (ImGui::Button("Create archive.q4b")) {
 					q4b::WriteArchive(FILE_LIST, "archive.q4b");
 				}

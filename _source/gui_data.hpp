@@ -17,10 +17,12 @@ struct GuiData {
 	int zstd_level_idx;
 	static std::vector<char*> zstd_level_arr;
 	static std::vector<int> zstd_level_num;
+	static int zstd_level_default_idx;
 
 	int lz4_level_idx;
 	static std::vector<char*> lz4_level_arr;
 	static std::vector<int> lz4_level_num;
+	static int lz4_level_default_idx;
 
 	static void InitializeArrays();
 
