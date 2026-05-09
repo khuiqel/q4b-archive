@@ -81,11 +81,13 @@ std::vector<CompressionFile> GetFileListSortedBySize(const std::vector<Compressi
 
 
 
-//TODO: should this make sure there are no duplicates?
-void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& output) noexcept {
+//TODO: this needs to make sure there are no duplicates
+void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
 	std::ofstream outfile(output_tmp, std::ios::binary);
 	if (!outfile) {
+		working_flag->store(false);
 		return;
 	}
 
@@ -93,9 +95,17 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
 
 	for (int i = 0; i < file_list.size(); i++) {
+		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+			for (int j = 0; j < i; j++) {
+				delete[] compressed_files_data[j];
+			}
+			working_flag->store(false);
+			return;
+		}
+
 		const CompressionFile& file = file_list[i];
 		char* file_data;
-		int64_t file_size = LoadFileIntoMemory(file.filepath, &file_data);
+		int64_t file_size = LoadFileIntoMemory(root_file_path / file.filepath, &file_data);
 		if (file_size == -1) {
 			//TODO
 		}
@@ -122,7 +132,6 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 				size_t compressed_size = CompressZstdData(file_data, file_header.uncompressed_size, file.compression_level, &(compressed_files_data[i]));
 				file_header.compressed_size = compressed_size;
 				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
-				// std::cout << "size: " << file_header.compressed_size << " | hash: " << file_header.compressed_hash << std::endl;
 				delete[] file_data;
 				break;
 			}
@@ -137,6 +146,15 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 		}
 
 		// std::cout << "compressed " << i << "\n";
+		files_completed->fetch_add(1, std::memory_order_release);
+	}
+
+	if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+		for (int i = 0; i < file_list.size(); i++) {
+			delete[] compressed_files_data[i];
+		}
+		working_flag->store(false);
+		return;
 	}
 
 	ArchiveHeader ah;
@@ -164,6 +182,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	for (int i = 0; i < file_list.size(); i++) {
 		delete[] compressed_files_data[i];
 	}
+	working_flag->store(false);
 }
 
 void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept {

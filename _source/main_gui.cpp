@@ -39,6 +39,12 @@ auto filepathCleaningFunc = [] (ImGuiInputTextCallbackData* data) {
 
 char root_file_path[1024];
 
+#include <thread>
+#include <atomic>
+std::atomic_bool thread_func_working = false;
+std::atomic_bool thread_func_exit_early = false;
+std::atomic_int thread_files_completed = 0;
+
 // Main code
 int main(int argc, char** argv)
 {
@@ -182,12 +188,13 @@ int main(int argc, char** argv)
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
+		const bool THREAD_IS_WORKING = thread_func_working.load();
 		ImGui::Begin("Main Window", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 		if (ImGui::BeginTabBar("MainTabBar", 0)) {
 			if (ImGui::BeginTabItem("Q4B Archiving")) {
 				ImGui::Text("Drop files here");
 
-				const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+				const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 				static ImGui_ExampleSelectionWithDeletion selection;
 				selection.UserData = (void*)&FILE_LIST;
 				selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
@@ -195,11 +202,11 @@ int main(int argc, char** argv)
 				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
 				const int ITEMS_COUNT = FILE_LIST.size();
 				ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
-				if (ImGui::BeginTable("Selection", 4, table_flags, ImVec2(0.0f, ImGui::GetFontSize() * 20)))
+				if (ImGui::BeginTable("Selection", 4, table_flags, ImVec2(ImGui::GetContentRegionAvail().x * .75f, ImGui::GetFontSize() * 20)))
 				{
 					ImGui::TableSetupColumn("File");
-					ImGui::TableSetupColumn("Compression Format");
-					ImGui::TableSetupColumn("Compression Level");
+					ImGui::TableSetupColumn("Scheme");
+					ImGui::TableSetupColumn("Level");
 					ImGui::TableSetupColumn("Hash?");
 					ImGui::TableSetupScrollFreeze(0, 1);
 					ImGui::TableHeadersRow();
@@ -251,7 +258,7 @@ int main(int argc, char** argv)
 							switch (FILE_LIST[i].compression_type) {
 								default: [[fallthrough]];
 								case q4b::CompressionScheme::Uncompressed:
-									//nothing?
+									FILE_LIST[i].compression_level = 0;
 									break;
 
 								case q4b::CompressionScheme::zstd:
@@ -273,8 +280,27 @@ int main(int argc, char** argv)
 				}
 
 				ImGui::SeparatorText("Create");
-				if (ImGui::Button("Create archive.q4b")) {
-					q4b::WriteArchive(FILE_LIST, "archive.q4b");
+				if (THREAD_IS_WORKING) {
+					const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
+					const float progress = float(files_completed) / float(FILE_LIST.size());
+					char buf[32];
+					sprintf(buf, "%u/%zu", files_completed, FILE_LIST.size());
+					ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), buf);
+
+					const bool EXIT_EARLY = thread_func_exit_early.load(std::memory_order_acquire);
+					if (EXIT_EARLY) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("Cancel")) {
+						thread_func_exit_early.store(true);
+					}
+					if (EXIT_EARLY) { ImGui::EndDisabled(); }
+				} else {
+					if (ImGui::Button("Create archive.q4b")) {
+						thread_func_working.store(true);
+						thread_func_exit_early.store(false);
+						thread_files_completed.store(0);
+						std::thread t(q4b::WriteArchive, FILE_LIST, root_file_path, "archive.q4b", &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+						t.detach();
+					}
 				}
 
 				ImGui::EndTabItem();

@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <type_traits>
+#include <atomic>
 
 #include <xxhash.h>
 
@@ -133,11 +134,16 @@ std::vector<CompressionFile> GetFileListSortedBySize(const std::vector<Compressi
 /* Writes the Q4B archive.
  *
  * @param file_list [in] List of files to process.
+ * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
+ * @param working_flag [in,out] Flag to signal if the function is still running.
+ * @param exit_flag [in] Flag to signal to the function if it should exit early.
+ * @param files_completed [in,out] Count of files compressed so far.
  *
  * @return void
  */
-void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& output) noexcept;
+void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 /* Decodes a Q4B archive.
  *
