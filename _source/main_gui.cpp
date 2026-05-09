@@ -119,14 +119,16 @@ int main(int argc, char** argv)
     style.FontSizeBase = 24.0f;
     io.Fonts->AddFontFromFileTTF("res/NotoSans-Regular.ttf");
 
-    // Our state
-    bool show_demo_window = true;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	bool show_demo_window = true;
+	// bool set_startup_tab = false;
+	bool rootDirIsLocked = true;
+	bool ret;
 
 	// Window icon
 	{
 		SDL_Surface* icon = SDL_LoadPNG("res/q4b-favicon.png");
-		SDL_SetWindowIcon(window, icon);
+		ret = SDL_SetWindowIcon(window, icon);
 		SDL_DestroySurface(icon);
 	}
 
@@ -162,12 +164,9 @@ int main(int argc, char** argv)
 					break;
 
 				case SDL_EVENT_DROP_FILE:
-					if (std::filesystem::exists(event.drop.data)) [[likely]] {
-						//TODO
+					if (rootDirIsLocked) {
 						std::filesystem::path path(event.drop.data);
 						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
-					} else {
-						printf("Not a file: %s\n", event.drop.data);
 					}
 					break;
 			}
@@ -192,6 +191,8 @@ int main(int argc, char** argv)
 		ImGui::Begin("Main Window", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 		if (ImGui::BeginTabBar("MainTabBar", 0)) {
 			if (ImGui::BeginTabItem("Q4B Archiving")) {
+				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
+				if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
 				ImGui::Text("Drop files here");
 
 				const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
@@ -247,10 +248,15 @@ int main(int argc, char** argv)
 					ImGui::EndTable();
 				}
 
+				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 				ImGui::SeparatorText("Change");
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
 				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
 				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
 				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
+				ImGui::PopItemWidth();
+
+				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (ImGui::Button("Change Files")) {
 					for (int i = 0; i < ITEMS_COUNT; i++) {
 						if (selection.Contains((ImGuiID)i)) {
@@ -271,15 +277,31 @@ int main(int argc, char** argv)
 						}
 					}
 				}
+				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
 				ImGui::SeparatorText("Configuration");
+				if (ImGui::Button(rootDirIsLocked ? "Unlock" : "Lock", { ImGui::CalcTextSize("Unlock").x + 2*style.FramePadding.x, 0.0f })) {
+					if (rootDirIsLocked) {
+						FILE_LIST.clear();
+					}
+					rootDirIsLocked = !rootDirIsLocked;
+				}
+				ImGui::SameLine();
+				if (rootDirIsLocked) { ImGui::BeginDisabled(); }
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 				ImGui::InputText("Root folder", root_file_path, IM_COUNTOF(root_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+				ImGui::PopItemWidth();
+				if (rootDirIsLocked) { ImGui::EndDisabled(); }
 
+				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (ImGui::Button("Prune Existence")) {
 					q4b::ExistencePrune(FILE_LIST);
 				}
+				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
+				if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 				ImGui::SeparatorText("Create");
+				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (THREAD_IS_WORKING) {
 					const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
 					const float progress = float(files_completed) / float(FILE_LIST.size());
@@ -302,6 +324,7 @@ int main(int argc, char** argv)
 						t.detach();
 					}
 				}
+				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
 				ImGui::EndTabItem();
 			}
@@ -318,18 +341,41 @@ int main(int argc, char** argv)
 				if (ImGui::Button("Read header of archive.q4b")) {
 					gdata.viewingArchiveFileList.clear();
 					q4b::ReadArchiveHeader("archive.q4b", gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
-					std::cout << gdata.viewingArchiveHeader.magic << " "
-					          << gdata.viewingArchiveHeader.flags << " "
-					          << gdata.viewingArchiveHeader.version << " "
-					          << gdata.viewingArchiveHeader.num_files << " "
-					          << gdata.viewingArchiveHeader.self_hash << std::endl;
-					for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
-						std::cout << file_header.path << " "
-						          << q4b::CompressionToStr(file_header.compression_type) << " "
-						          << file_header.compressed_size << " "
-						          << file_header.uncompressed_size << " "
-						          << file_header.compressed_hash << " "
-						          << file_header.uncompressed_hash << std::endl;
+					gdata.viewingArchive = true;
+				}
+
+				//TODO: select these files for decompression
+				if (gdata.viewingArchive) {
+					const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+					if (ImGui::BeginTable("table1", 4, table_flags)) {
+						ImGui::TableSetupColumn("File");
+						ImGui::TableSetupColumn("Scheme");
+						ImGui::TableSetupColumn("Compressed Size");
+						ImGui::TableSetupColumn("Uncompressed Size");
+						ImGui::TableHeadersRow();
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text(gdata.viewingArchiveHeader.magic);
+						ImGui::TableNextColumn();
+						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.flags).c_str());
+						ImGui::TableNextColumn();
+						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.version).c_str());
+						ImGui::TableNextColumn();
+						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
+
+						for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
+							ImGui::TableNextRow();
+							ImGui::TableSetColumnIndex(0);
+							ImGui::Text(file_header.path);
+							ImGui::TableNextColumn();
+							ImGui::Text(q4b::CompressionToStr(file_header.compression_type));
+							ImGui::TableNextColumn();
+							ImGui::Text(std::to_string(file_header.compressed_size).c_str());
+							ImGui::TableNextColumn();
+							ImGui::Text(std::to_string(file_header.uncompressed_size).c_str());
+						}
+						ImGui::EndTable();
 					}
 				}
 
