@@ -109,7 +109,13 @@ struct CompressionFile {
 
 	inline const char* getFilepath() const {
 		// This function exists because MSVC doesn't know how to convert std::filesystem::path::c_str() to a C-str
+		// HACK: use .c_str() on platforms that work, use .string().c_str() otherwise
+		// TODO: MSVC is still reading garbage, but it's correct garbage 99% of the time
+		#ifdef _WIN32
 		return (const char*) filepath.string().c_str();
+		#else
+		return (const char*) filepath.c_str();
+		#endif
 	}
 };
 
