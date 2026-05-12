@@ -119,6 +119,19 @@ struct CompressionFile {
 	}
 };
 
+enum class ErrorSeverity {
+	Unknown,
+	info,
+	warn,
+	error,
+	Count
+};
+
+struct ErrorMessage {
+	ErrorSeverity severity;
+	std::string msg;
+};
+
 
 
 /* Removes the files that no longer exist.
@@ -129,27 +142,22 @@ struct CompressionFile {
  */
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
 
-/* Returns a list of the files sorted by their filesize.
- *
- * @param file_list [in] List of files to process.
- *
- * @return A new list of files, sorted from largest to smallest.
- */
-std::vector<CompressionFile> GetFileListSortedBySize(const std::vector<CompressionFile>& file_list) noexcept;
-
 /* Writes the Q4B archive.
  *
  * @param file_list [in] List of files to process.
  * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
+ * @param messages [out,optional] Accumulated error messages. (TODO)
  * @param working_flag [in,out] Flag to signal if the function is still running.
  * @param exit_flag [in] Flag to signal to the function if it should exit early.
- * @param files_completed [in,out] Count of files compressed so far.
+ * @param files_completed [out] Count of files compressed so far.
  *
  * @return void
  */
-void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                         std::vector<ErrorMessage>* messages,
+                         std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+}
 
 /* Decodes a Q4B archive.
  *

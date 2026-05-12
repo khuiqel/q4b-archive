@@ -70,23 +70,17 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 }
 //probably put this on a different thread
 
-std::vector<CompressionFile> GetFileListSortedBySize(const std::vector<CompressionFile>& file_list) noexcept {
-	std::vector<CompressionFile> sorted_files(file_list.begin(), file_list.end());
-	std::sort(sorted_files.begin(), sorted_files.end(), [](const auto& lhs, const auto& rhs) {
-		std::error_code ec;
-		return std::filesystem::file_size(lhs.filepath, ec) < std::filesystem::file_size(rhs.filepath, ec);
-	});
-	return sorted_files;
-}
-
 
 
 //TODO: this needs to make sure there are no duplicates
 void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+                  std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
 	std::ofstream outfile(output_tmp, std::ios::binary);
 	if (!outfile) {
+		// TODO: Is std::atomic_thread_fence needed for messages? Or is it fine because because the default memory order (memory_order_seq_cst) on working_flag forces a fence?
+		messages->push_back({ ErrorSeverity::error, "Could not reserve temp file" });
 		working_flag->store(false);
 		return;
 	}
@@ -96,6 +90,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 
 	for (int i = 0; i < file_list.size(); i++) {
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+			messages->push_back({ ErrorSeverity::info, "Quitting early" });
 			for (int j = 0; j < i; j++) {
 				delete[] compressed_files_data[j];
 			}
@@ -106,8 +101,13 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 		const CompressionFile& file = file_list[i];
 		char* file_data;
 		int64_t file_size = LoadFileIntoMemory(root_file_path / file.filepath, &file_data);
-		if (file_size == -1) {
-			//TODO
+		if (file_size == -1) [[unlikely]] {
+			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.filepath).string() + "\"" });
+			for (int j = 0; j < i; j++) {
+				delete[] compressed_files_data[j];
+			}
+			working_flag->store(false);
+			return;
 		}
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
@@ -118,7 +118,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 
 		switch (file.compression_type) {
 			default:
-				std::cerr << "ERROR: Unknown compression: " << (int64_t)file.compression_type << std::endl;
+				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.filepath).string() + "\": " + std::to_string((uint64_t)file.compression_type) });
 				file_header.compression_type = CompressionScheme::Uncompressed;
 				[[fallthrough]];
 			case CompressionScheme::Uncompressed: {
@@ -145,11 +145,11 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 			}
 		}
 
-		// std::cout << "compressed " << i << "\n";
 		files_completed->fetch_add(1, std::memory_order_release);
 	}
 
 	if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+		messages->push_back({ ErrorSeverity::info, "Quitting early" });
 		for (int i = 0; i < file_list.size(); i++) {
 			delete[] compressed_files_data[i];
 		}
@@ -174,9 +174,8 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	std::error_code ec;
 	std::filesystem::rename(output_tmp, output, ec);
 	if (ec) {
-		std::filesystem::remove(output_tmp);
-	} else {
-		// std::cout << "wrote .q4b\n";
+		messages->push_back({ ErrorSeverity::error, "Could not convert the temp file to real file" });
+		// std::filesystem::remove(output_tmp);
 	}
 
 	for (int i = 0; i < file_list.size(); i++) {
