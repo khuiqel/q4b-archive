@@ -73,7 +73,8 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 
 
 //TODO: this needs to make sure there are no duplicates
-void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+template <bool extraFeatures>
+void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
                   std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
@@ -81,7 +82,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	if (!outfile) {
 		// TODO: Is std::atomic_thread_fence needed for messages? Or is it fine because because the default memory order (memory_order_seq_cst) on working_flag forces a fence?
 		messages->push_back({ ErrorSeverity::error, "Could not reserve temp file" });
-		working_flag->store(false);
+		if constexpr (extraFeatures) working_flag->store(false);
 		return;
 	}
 
@@ -89,14 +90,15 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
 
 	for (int i = 0; i < file_list.size(); i++) {
-		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
-			messages->push_back({ ErrorSeverity::info, "Quitting early" });
-			for (int j = 0; j < i; j++) {
-				delete[] compressed_files_data[j];
+		if constexpr (extraFeatures)
+			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+				messages->push_back({ ErrorSeverity::info, "Quitting early" });
+				for (int j = 0; j < i; j++) {
+					delete[] compressed_files_data[j];
+				}
+				working_flag->store(false);
+				return;
 			}
-			working_flag->store(false);
-			return;
-		}
 
 		const CompressionFile& file = file_list[i];
 		char* file_data;
@@ -106,7 +108,7 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 			for (int j = 0; j < i; j++) {
 				delete[] compressed_files_data[j];
 			}
-			working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false);
 			return;
 		}
 
@@ -145,17 +147,18 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 			}
 		}
 
-		files_completed->fetch_add(1, std::memory_order_release);
+		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
 	}
 
-	if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
-		messages->push_back({ ErrorSeverity::info, "Quitting early" });
-		for (int i = 0; i < file_list.size(); i++) {
-			delete[] compressed_files_data[i];
+	if constexpr (extraFeatures)
+		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+			messages->push_back({ ErrorSeverity::info, "Quitting early" });
+			for (int i = 0; i < file_list.size(); i++) {
+				delete[] compressed_files_data[i];
+			}
+			working_flag->store(false);
+			return;
 		}
-		working_flag->store(false);
-		return;
-	}
 
 	ArchiveHeader ah;
 	ah.num_files = file_list.size();
@@ -181,8 +184,14 @@ void WriteArchive(const std::vector<CompressionFile>& file_list, const std::file
 	for (int i = 0; i < file_list.size(); i++) {
 		delete[] compressed_files_data[i];
 	}
-	working_flag->store(false);
+	if constexpr (extraFeatures) working_flag->store(false);
 }
+template void WriteArchive_internal<true>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template void WriteArchive_internal<false>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept {
 	if (std::filesystem::exists(output)) {

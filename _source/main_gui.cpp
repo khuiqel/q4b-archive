@@ -321,8 +321,9 @@ int main(int argc, char** argv)
 						thread_func_working.store(true);
 						thread_func_exit_early.store(false);
 						thread_files_completed.store(0);
-						std::thread t(q4b::WriteArchive, FILE_LIST, root_file_path, "archive.q4b", &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, "archive.q4b", &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 						t.detach();
+						//TODO: should probably make a global thread instead of re-creating one
 					}
 				}
 				if (!rootDirIsLocked) { ImGui::EndDisabled(); }

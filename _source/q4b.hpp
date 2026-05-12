@@ -142,6 +142,11 @@ struct ErrorMessage {
  */
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
 
+template <bool extraFeatures>
+void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                           std::vector<ErrorMessage>* messages,
+                           std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
 /* Writes the Q4B archive.
  *
  * @param file_list [in] List of files to process.
@@ -156,7 +161,23 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
  */
 inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
                          std::vector<ErrorMessage>* messages,
-                         std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+                         std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	WriteArchive_internal<true>(file_list, root_file_path, output, messages, working_flag, exit_flag, files_completed);
+}
+
+/* Writes the Q4B archive.
+ *
+ * @param file_list [in] List of files to process.
+ * @param root_file_path [in] The root which file_list is relative to.
+ * @param output [in] Output name of the archive.
+ * @param messages [out,optional] Accumulated error messages. (TODO)
+ *
+ * @return void
+ */
+inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                         std::vector<ErrorMessage>* messages) noexcept {
+	WriteArchive_internal<false>(file_list, root_file_path, output, messages, nullptr, nullptr, nullptr);
 }
 
 /* Decodes a Q4B archive.
