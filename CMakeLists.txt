@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20...3.31)
 project(q4b)
 set(PROJECT_GUI_NAME ${PROJECT_NAME}-gui)
+set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
 
 # Note: when changing these defaults, you have to delete CMakeCache.txt
 option(USE_SYSTEM_SDL "Use the system SDL3 package" OFF)
@@ -30,8 +31,10 @@ endif()
 # Enable SSE4.2
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(COMPILER_MARCH_FLAGS "/arch:SSE4.2")
+	# ARM: /arch:armv8.1 (8.0 is the default)
 else()
 	set(COMPILER_MARCH_FLAGS "-march=x86-64-v2")
+	# ARM: -march=armv8.1-a
 endif()
 
 set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} ${COMPILER_MARCH_FLAGS}")
@@ -68,26 +71,27 @@ set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # Just in case
 
 add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
-add_subdirectory(Externals/zstd/build/cmake)
-add_subdirectory(Externals/lz4/build/cmake)
+add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
+add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
 
-# if(USE_SYSTEM_SDL)
-# 	find_package(SDL3 REQUIRED COMPONENTS video)
-# else()
-# 	# TODO
-# 	find_package(SDL3 REQUIRED COMPONENTS video)
-# 	# add_subdirectory(Externals/SDL)
-# endif()
-
-# if(USE_SYSTEM_ZSTD)
-# 	find_package(zstd REQUIRED)
-# else()
-# 	add_subdirectory(Externals/zstd/build/cmake)
-# endif()
-
-include_directories(SDL     PRIVATE Externals/SDL/include)
-include_directories(imgui   PRIVATE Externals/imgui Externals/imgui/backends)
-include_directories(xxHash  PRIVATE Externals/xxHash)
+# These don't work because the packages don't provide the CMake files to find their libs/dirs, or something:
+#[[
+if(USE_SYSTEM_SDL)
+	find_package(SDL3 3.4.0 REQUIRED COMPONENTS video render OPTIONAL_COMPONENTS gpu joystick)
+else()
+	add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
+endif()
+if(USE_SYSTEM_ZSTD)
+	find_package(zstd 1.5.0 REQUIRED)
+else()
+	add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
+endif()
+if(USE_SYSTEM_LZ4)
+	find_package(lz4 1.8.0 REQUIRED)
+else()
+	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
+endif()
+#]]
 
 add_executable(${PROJECT_NAME}
 	_source/q4b.cpp
@@ -126,19 +130,21 @@ if (MSVC)
 	# target_link_options(${PROJECT_GUI_NAME} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif()
 
+target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
+include_directories(PRIVATE Externals/xxHash)
+
 target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static)
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static)
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3)
 
-# Tests!
 
+# Tests!
 enable_testing()
-set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-add_subdirectory(Externals/googletest)
+add_subdirectory(Externals/googletest EXCLUDE_FROM_ALL)
 
-add_executable(${PROJECT_TESTS_NAME}
+add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 	tests/archive.cpp
 
 	_source/q4b.cpp
