@@ -23,8 +23,10 @@ void GuiData::InitializeArrays() {
 
 	for (int i = 1; i <= ZSTD_maxCLevel(); i++) {
 		std::string level = std::to_string(i);
-		if (i >= 20) {
+		if (i > 19) {
 			level += " --ultra";
+			// CLI disables values >19 (ZSTDCLI_CLEVEL_MAX), but the zstd lib doesn't care
+			// Values needing --ultra tend to disable/reduce multi-threading though
 		} else if (i == ZSTD_defaultCLevel()) {
 			level += " (default)";
 			zstd_level_default_idx = zstd_level_arr.size();

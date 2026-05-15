@@ -70,6 +70,28 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 }
 //probably put this on a different thread
 
+// Adapted from setMaxCompression(ZSTD_compressionParameters*) in programs/zstdcli.c
+static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_windowLog,        ZSTD_cParam_getBounds(ZSTD_c_windowLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_chainLog,         ZSTD_cParam_getBounds(ZSTD_c_chainLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_hashLog,          ZSTD_cParam_getBounds(ZSTD_c_hashLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_searchLog,        ZSTD_cParam_getBounds(ZSTD_c_searchLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_minMatch,         ZSTD_cParam_getBounds(ZSTD_c_minMatch).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_targetLength,     ZSTD_cParam_getBounds(ZSTD_c_targetLength).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_strategy,         ZSTD_cParam_getBounds(ZSTD_c_strategy).upperBound);
+
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_overlapLog,       ZSTD_cParam_getBounds(ZSTD_c_overlapLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashLog,       ZSTD_cParam_getBounds(ZSTD_c_ldmHashLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashRateLog,   ZSTD_cParam_getBounds(ZSTD_c_ldmHashRateLog).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmMinMatch,      ZSTD_cParam_getBounds(ZSTD_c_ldmMinMatch).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmBucketSizeLog, ZSTD_cParam_getBounds(ZSTD_c_ldmBucketSizeLog).upperBound);
+
+	// Setting ZSTD_c_enableLongDistanceMatching doesn't seem to be necessary (auto-set by windowLog and strategy)
+	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_enableLongDistanceMatching, ZSTD_cParam_getBounds(ZSTD_c_enableLongDistanceMatching).upperBound);
+	// TODO: Is compression level needed?
+	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, ZSTD_maxCLevel());
+}
+
 
 
 //TODO: this needs to make sure there are no duplicates
@@ -88,6 +110,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 	std::vector<char*> compressed_files_data(file_list.size());
 	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
+	constexpr int threadCount = 4; //TODO
 
 	for (int i = 0; i < file_list.size(); i++) {
 		if constexpr (extraFeatures)
@@ -131,10 +154,26 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 			}
 
 			case CompressionScheme::zstd: {
-				size_t compressed_size = CompressZstdData(file_data, file_header.uncompressed_size, file.compression_level, &(compressed_files_data[i]));
+				//TODO: this should use a fixed Zstd context instead
+				ZSTD_CCtx* cctx = ZSTD_createCCtx();
+				ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, threadCount);
+				if (file.compression_level == INT_MAX) {
+					zstd_setMaxCompression(cctx);
+				} else {
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, file.compression_level);
+					// Other parameters are automatically set given the compression level (that would've been a huge headache otherwise)
+				}
+
+				ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
+				ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
+				ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
+
+				size_t compressed_size = CompressZstdData(cctx, file_data, file_header.uncompressed_size, &(compressed_files_data[i]));
 				file_header.compressed_size = compressed_size;
 				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
 				delete[] file_data;
+
+				ZSTD_freeCCtx(cctx);
 				break;
 			}
 
@@ -292,7 +331,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 			case CompressionScheme::zstd: {
 				char* decompressed_file;
-				size_t decompressed_size = UncompressZstdData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
+				size_t decompressed_size = DecompressZstdData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
 				if (decompressed_size != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
@@ -305,7 +344,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 			case CompressionScheme::lz4: {
 				char* decompressed_file;
-				size_t decompressed_size = UncompressLz4Data(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
+				size_t decompressed_size = DecompressLz4Data(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
 				if (decompressed_size != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
@@ -401,14 +440,11 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) n
 	// No need to call file.close() because fstream destructors close automatically
 }
 
-//TODO: compressing without making the frame needs a context
-size_t CompressZstdData(const void* file_data, size_t uncompressedSize, int compression_level, char** compressed_file) noexcept {
-	size_t compressedBufSize = ZSTD_compressBound(uncompressedSize);
+size_t CompressZstdData(void* cctx, const void* file_data, size_t uncompressed_size, char** compressed_file) noexcept {
+	size_t compressedBufSize = ZSTD_compressBound(uncompressed_size);
 	*compressed_file =  new char[compressedBufSize];
-	size_t compressedSize = ZSTD_compress(*compressed_file, compressedBufSize, file_data, uncompressedSize, compression_level);
+	size_t compressedSize = ZSTD_compress2((ZSTD_CCtx*)cctx, *compressed_file, compressedBufSize, file_data, uncompressed_size);
 	return compressedSize;
-	//TODO: handle --max, also should probably have a fixed Zstd context
-	//TODO: ZSTD_getErrorName()
 }
 
 size_t CompressLz4Data(const void* file_data, size_t uncompressedSize, int compression_level, char** compressed_file) noexcept {
@@ -419,14 +455,14 @@ size_t CompressLz4Data(const void* file_data, size_t uncompressedSize, int compr
 	return compressedSize;
 }
 
-size_t UncompressZstdData(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
+size_t DecompressZstdData(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
 	// size_t decompressedBufSize = ZSTD_getFrameContentSize(file_data, compressed_file_size); // ZSTD_decompressBound()
 	*decompressed_file = new char[decompressed_file_size];
 	size_t decompressedSize = ZSTD_decompress(*decompressed_file, decompressed_file_size, file_data, compressed_file_size);
 	return decompressedSize;
 }
 
-size_t UncompressLz4Data(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
+size_t DecompressLz4Data(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
 	// size_t decompressedBufSize = ZSTD_getFrameContentSize(file_data, compressed_file_size); // (LZ4 generates blocks by default, not frames)
 	*decompressed_file = new char[decompressed_file_size];
 	size_t decompressedSize = LZ4_decompress_safe((const char*)file_data, (char*)(*decompressed_file), compressed_file_size, decompressed_file_size);

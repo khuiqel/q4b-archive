@@ -208,7 +208,7 @@ int main(int argc, char** argv)
 					ImGui::TableSetupColumn("File");
 					ImGui::TableSetupColumn("Scheme");
 					ImGui::TableSetupColumn("Level");
-					ImGui::TableSetupColumn("Hash?");
+					ImGui::TableSetupColumn("Write Metadata?");
 					ImGui::TableSetupScrollFreeze(0, 1);
 					ImGui::TableHeadersRow();
 
