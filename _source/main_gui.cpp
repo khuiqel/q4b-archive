@@ -38,6 +38,8 @@ auto filepathCleaningFunc = [] (ImGuiInputTextCallbackData* data) {
 };
 
 char root_file_path[1024];
+char archive_file_path[1024] = "archive.q4b";
+char output_file_path[1024] = "output";
 
 #include <thread>
 #include <atomic>
@@ -191,8 +193,8 @@ int main(int argc, char** argv)
 		ImGui::Begin("Main Window", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 		if (ImGui::BeginTabBar("MainTabBar", 0)) {
 			if (ImGui::BeginTabItem("Q4B Archiving")) {
-				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
+				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				ImGui::Text("Drop files here");
 
 				const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
@@ -247,8 +249,8 @@ int main(int argc, char** argv)
 						selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
 					ImGui::EndTable();
 				}
-
 				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
+
 				ImGui::SeparatorText("Change");
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
 				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
@@ -297,10 +299,22 @@ int main(int argc, char** argv)
 				if (ImGui::Button("Prune Existence")) {
 					q4b::ExistencePrune(FILE_LIST);
 				}
+				if (ImGui::BeginItemTooltip()) {
+					ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+					ImGui::TextUnformatted("Remove files that no longer exist");
+					ImGui::PopTextWrapPos();
+					ImGui::EndTooltip();
+				}
 				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
-
 				if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
+
 				ImGui::SeparatorText("Create");
+				if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+				ImGui::InputText("Archive name", archive_file_path, IM_COUNTOF(archive_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+				ImGui::PopItemWidth();
+				if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
+
 				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (THREAD_IS_WORKING) {
 					const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
@@ -316,12 +330,12 @@ int main(int argc, char** argv)
 					}
 					if (EXIT_EARLY) { ImGui::EndDisabled(); }
 				} else {
-					if (ImGui::Button("Create archive.q4b")) {
+					if (ImGui::Button("Create Archive")) {
 						gdata.messages.clear();
 						thread_func_working.store(true);
 						thread_func_exit_early.store(false);
 						thread_files_completed.store(0);
-						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, "archive.q4b", &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 						t.detach();
 						//TODO: should probably make a global thread instead of re-creating one
 					}
@@ -334,20 +348,29 @@ int main(int argc, char** argv)
 			if (ImGui::BeginTabItem("Q4B Unpacking")) {
 				ImGui::TextUnformatted("TODO");
 
-				if (ImGui::Button("Preview archive.q4b")) {
+				if (ImGui::Button("Preview Archive")) {
 					//TODO: select which ones to unpack
 				}
-				if (ImGui::Button("Decode archive.q4b")) {
-					q4b::DecodeArchive("archive.q4b", "output");
+
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+				ImGui::InputText("Output folder", output_file_path, IM_COUNTOF(output_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+				ImGui::PopItemWidth();
+
+				if (ImGui::Button("Decode Archive")) {
+					q4b::DecodeArchive(archive_file_path, output_file_path);
 				}
-				if (ImGui::Button("Read header of archive.q4b")) {
+
+				if (ImGui::Button("Read Archive Header")) {
 					gdata.viewingArchiveFileList.clear();
-					q4b::ReadArchiveHeader("archive.q4b", gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
+					q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
 					gdata.viewingArchive = true;
 				}
 
 				//TODO: select these files for decompression
 				if (gdata.viewingArchive) {
+					if (ImGui::Button("Stop Viewing")) {
+						gdata.viewingArchive = false;
+					}
 					const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 					if (ImGui::BeginTable("table1", 4, table_flags)) {
 						ImGui::TableSetupColumn("File");
@@ -464,6 +487,8 @@ int main(int argc, char** argv)
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
     }
+
+	thread_func_exit_early.store(true);
 
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
