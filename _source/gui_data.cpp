@@ -2,11 +2,14 @@
 #include <algorithm>
 #include <string>
 #include <climits> //INT_MAX
+#include <thread> //hardware_concurrency
 
 #include <zstd.h>
 #include <lz4frame.h>
 #include <iostream>
 
+int GuiData::threadCountMax = 1;
+std::vector<const char*> GuiData::compression_types = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
 std::vector<char*> GuiData::zstd_level_arr;
 std::vector<int> GuiData::zstd_level_num;
 std::vector<char*> GuiData::lz4_level_arr;
@@ -14,10 +17,12 @@ std::vector<int> GuiData::lz4_level_num;
 int GuiData::zstd_level_default_idx = -1;
 int GuiData::lz4_level_default_idx = -1;
 
-void GuiData::InitializeArrays() {
+void GuiData::Initialize() {
 	if (!zstd_level_arr.empty() || !lz4_level_arr.empty()) {
 		return;
 	}
+
+	threadCountMax = std::max(1u, std::thread::hardware_concurrency());
 
 	// Zstd
 
@@ -64,7 +69,8 @@ void GuiData::InitializeArrays() {
 }
 
 GuiData::GuiData() {
-	InitializeArrays();
+	Initialize();
+	threadCount = 4;
 	zstd_level_idx = zstd_level_default_idx;
 	lz4_level_idx = lz4_level_default_idx;
 }

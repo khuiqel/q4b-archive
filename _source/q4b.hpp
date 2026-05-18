@@ -144,7 +144,7 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
 
 template <bool extraFeatures>
 void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                           std::vector<ErrorMessage>* messages,
+                           int threadCount, std::vector<ErrorMessage>* messages,
                            std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 /* Writes the Q4B archive.
@@ -152,18 +152,19 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
  * @param file_list [in] List of files to process.
  * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
+ * @param threadCount [in] Number of threads to use, counting the starter thread.
  * @param messages [out,optional] Accumulated error messages. (TODO)
- * @param working_flag [in,out] Flag to signal if the function is still running.
+ * @param working_flag [out] Flag to signal if the function is still running.
  * @param exit_flag [in] Flag to signal to the function if it should exit early.
  * @param files_completed [out] Count of files compressed so far.
  *
  * @return void
  */
 inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         std::vector<ErrorMessage>* messages,
+                         int threadCount, std::vector<ErrorMessage>* messages,
                          std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
-	WriteArchive_internal<true>(file_list, root_file_path, output, messages, working_flag, exit_flag, files_completed);
+	WriteArchive_internal<true>(file_list, root_file_path, output, threadCount, messages, working_flag, exit_flag, files_completed);
 }
 
 /* Writes the Q4B archive.
@@ -171,13 +172,14 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
  * @param file_list [in] List of files to process.
  * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
+ * @param threadCount [in] Number of threads to use, counting the starter thread.
  * @param messages [out,optional] Accumulated error messages. (TODO)
  *
  * @return void
  */
 inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         std::vector<ErrorMessage>* messages) noexcept {
-	WriteArchive_internal<false>(file_list, root_file_path, output, messages, nullptr, nullptr, nullptr);
+                         int threadCount, std::vector<ErrorMessage>* messages) noexcept {
+	WriteArchive_internal<false>(file_list, root_file_path, output, threadCount, messages, nullptr, nullptr, nullptr);
 }
 
 /* Decodes a Q4B archive.

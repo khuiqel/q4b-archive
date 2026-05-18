@@ -7,6 +7,7 @@
 const std::filesystem::path TEST_ARCHIVE_PATH = "tests/test.q4b";
 const std::filesystem::path TEST_FILE = "res/NotoSans-Regular.ttf";
 const std::filesystem::path TEST_FILE_NONEXISTANT = "nope.txt";
+constexpr int THREAD_COUNT = 4;
 
 namespace {
 
@@ -17,7 +18,7 @@ TEST(WriteArchive, NoFiles) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files;
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader));
@@ -32,7 +33,7 @@ TEST(WriteArchive, OneFileUncompressed) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
@@ -47,7 +48,7 @@ TEST(WriteArchive, OneFileCompressedZstd) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	// Assume Zstd can compress the test file to less than its original size
@@ -63,7 +64,7 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + 2*std::filesystem::file_size(TEST_FILE));
@@ -78,7 +79,7 @@ TEST(WriteArchive, TwoFilesCompressedZstd) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1, 0 }, { TEST_FILE, q4b::CompressionScheme::zstd, 1, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	// Assume Zstd can compress the test file to less than its original size
@@ -96,7 +97,7 @@ TEST(WriteArchive, OneFileNonexistant) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
 	EXPECT_FALSE(std::filesystem::exists(TEST_ARCHIVE_PATH));
@@ -114,7 +115,7 @@ TEST(WriteArchive, SomeFilesExist) {
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
-	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, &messages);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
 	EXPECT_FALSE(std::filesystem::exists(TEST_ARCHIVE_PATH));

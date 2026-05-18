@@ -10,10 +10,13 @@ struct GuiData {
 	q4b::ArchiveHeader viewingArchiveHeader;
 	std::vector<q4b::ArchivedFileHeader> viewingArchiveFileList;
 	std::vector<q4b::ErrorMessage> messages;
+	int threadCount;
+	static int threadCountMax;
 
 	// Compressing files
 
 	int compression_type_idx = 2;
+	static std::vector<const char*> compression_types;
 
 	int zstd_level_idx;
 	static std::vector<char*> zstd_level_arr;
@@ -25,7 +28,7 @@ struct GuiData {
 	static std::vector<int> lz4_level_num;
 	static int lz4_level_default_idx;
 
-	static void InitializeArrays();
+	static void Initialize();
 
 	GuiData();
 };

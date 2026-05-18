@@ -202,7 +202,6 @@ int main(int argc, char** argv)
 				selection.UserData = (void*)&FILE_LIST;
 				selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
 
-				static const char* compression_types[3] = { q4b::CompressionToStr((q4b::CompressionScheme)0), q4b::CompressionToStr((q4b::CompressionScheme)1), q4b::CompressionToStr((q4b::CompressionScheme)2) };
 				const int ITEMS_COUNT = FILE_LIST.size();
 				ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
 				if (ImGui::BeginTable("Selection", 4, table_flags, ImVec2(ImGui::GetContentRegionAvail().x * .75f, ImGui::GetFontSize() * 20)))
@@ -253,7 +252,7 @@ int main(int argc, char** argv)
 
 				ImGui::SeparatorText("Change");
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
-				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, compression_types, IM_COUNTOF(compression_types));
+				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
 				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
 				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
 				ImGui::PopItemWidth();
@@ -295,6 +294,10 @@ int main(int argc, char** argv)
 				ImGui::PopItemWidth();
 				if (rootDirIsLocked) { ImGui::EndDisabled(); }
 
+				static constexpr uint32_t threadMin = 1;
+				ImGui::SliderScalar("Thread count", ImGuiDataType_S32, &gdata.threadCount, &threadMin, &GuiData::threadCountMax);
+				//TODO: another thread count for how many workers to create; the one above is how many helper threads each worker thread gets
+
 				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (ImGui::Button("Prune Existence")) {
 					q4b::ExistencePrune(FILE_LIST);
@@ -335,7 +338,7 @@ int main(int argc, char** argv)
 						thread_func_working.store(true);
 						thread_func_exit_early.store(false);
 						thread_files_completed.store(0);
-						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, gdata.threadCount, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 						t.detach();
 						//TODO: should probably make a global thread instead of re-creating one
 					}

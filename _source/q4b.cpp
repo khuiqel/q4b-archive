@@ -97,7 +97,8 @@ static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
 //TODO: this needs to make sure there are no duplicates
 template <bool extraFeatures>
 void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                  std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+                  int threadCount, std::vector<ErrorMessage>* messages,
+                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
 	std::ofstream outfile(output_tmp, std::ios::binary);
@@ -110,7 +111,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 	std::vector<char*> compressed_files_data(file_list.size());
 	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
-	constexpr int threadCount = 4; //TODO
+	threadCount = (threadCount > 0) ? (threadCount-1) : 0;
 
 	for (int i = 0; i < file_list.size(); i++) {
 		if constexpr (extraFeatures)
@@ -157,7 +158,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				//TODO: this should use a fixed Zstd context instead
 				ZSTD_CCtx* cctx = ZSTD_createCCtx();
 				ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, threadCount);
-				if (file.compression_level == INT_MAX) {
+				if (file.compression_level == INT_MAX) [[unlikely]] {
 					zstd_setMaxCompression(cctx);
 				} else {
 					ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, file.compression_level);
@@ -227,10 +228,12 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 }
 template void WriteArchive_internal<true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-	std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	int threadCount, std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template void WriteArchive_internal<false>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-	std::vector<ErrorMessage>* messages, std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	int threadCount, std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept {
 	if (std::filesystem::exists(output)) {

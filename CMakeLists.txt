@@ -68,7 +68,8 @@ set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # Just in case
+set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
+set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # TODO: Even if this is disabled, Zstd's CMake file still reports multithreading is enabled... should ZSTD_MULTITHREAD_SUPPORT be set instead?
 
 add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
