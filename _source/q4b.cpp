@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <cstring> //memcpy
+#include <algorithm>
 
 #include <zstd.h>
 #include <lz4.h>
@@ -94,12 +95,12 @@ static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
 
 
 
-//TODO: this needs to make sure there are no duplicates
 template <bool extraFeatures>
 void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
                   int threadCount, std::vector<ErrorMessage>* messages,
                   std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
+	// Open file
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
 	std::ofstream outfile(output_tmp, std::ios::binary);
 	if (!outfile) {
@@ -109,6 +110,38 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		return;
 	}
 
+	// Check for existence and duplicates
+	{
+		bool allFilesExist = true;
+		for (int i = 0; i < file_list.size(); i++) {
+			if (!std::filesystem::exists(root_file_path / file_list[i].filepath)) {
+				messages->push_back({ ErrorSeverity::error, file_list[i].filepath.string() + " doesn't exist" });
+				allFilesExist = false;
+			}
+		}
+		if (!allFilesExist) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+
+		bool duplicatesExist = false;
+		std::vector<CompressionFile> sorted_list(file_list);
+		std::sort(sorted_list.begin(), sorted_list.end(), [](const auto& lhs, const auto& rhs) {
+			return lhs.filepath < rhs.filepath;
+		});
+		for (int i = 1; i < file_list.size(); i++) {
+			if (sorted_list[i-1].filepath == sorted_list[i].filepath) {
+				messages->push_back({ ErrorSeverity::error, sorted_list[i].filepath.string() + " has a duplicate" });
+				duplicatesExist = true;
+			}
+		}
+		if (duplicatesExist) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+	}
+
+	// Compress files
 	std::vector<char*> compressed_files_data(file_list.size());
 	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
 	threadCount = (threadCount > 0) ? (threadCount-1) : 0;
@@ -200,6 +233,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 			return;
 		}
 
+	// Write archive
 	ArchiveHeader ah;
 	ah.num_files = file_list.size();
 	ah.computeHash();

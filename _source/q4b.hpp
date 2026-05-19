@@ -13,7 +13,6 @@
 #include <filesystem>
 #include <vector>
 #include <unordered_map>
-#include <algorithm>
 #include <cstdint>
 #include <type_traits>
 #include <atomic>
@@ -149,7 +148,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 /* Writes the Q4B archive.
  *
- * @param file_list [in] List of files to process.
+ * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
  * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
  * @param threadCount [in] Number of threads to use, counting the starter thread.
@@ -169,7 +168,7 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
 
 /* Writes the Q4B archive.
  *
- * @param file_list [in] List of files to process.
+ * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
  * @param root_file_path [in] The root which file_list is relative to.
  * @param output [in] Output name of the archive.
  * @param threadCount [in] Number of threads to use, counting the starter thread.
