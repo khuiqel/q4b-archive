@@ -99,6 +99,12 @@ static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
 //TODO: remember to dump in LE!
 
+enum class Q4B_CompressionFileFlags : uint32_t {
+	None                         = 0,
+	DoWriteMetadata              = 1 << 0,
+	TreatFileAsAlreadyCompressed = 1 << 1, // TODO: How to handle the uncompressed size? Add unknown size flag to the file header?
+};
+
 //note: this is for the application, the previous one is for the archive
 struct CompressionFile {
 	ArchivedFileHeader data;
@@ -108,6 +114,10 @@ struct CompressionFile {
 	inline const char* getFilepath() const {
 		return data.path;
 	}
+
+	inline void setFlag(Q4B_CompressionFileFlags flag) { compression_flags |= static_cast<uint32_t>(flag); }
+	inline void unsetFlag(Q4B_CompressionFileFlags flag) { compression_flags &= ~static_cast<uint32_t>(flag); }
+	inline bool getFlag(Q4B_CompressionFileFlags flag) const { return compression_flags & static_cast<uint32_t>(flag); }
 
 	CompressionFile() {
 		data.setPath("");

@@ -211,12 +211,12 @@ int main(int argc, char** argv)
 
 				const int ITEMS_COUNT = FILE_LIST.size();
 				ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
-				if (ImGui::BeginTable("Selection", 4, table_flags, ImVec2(ImGui::GetContentRegionAvail().x * .75f, ImGui::GetFontSize() * 20)))
+				if (ImGui::BeginTable("Selection", 3, table_flags, ImVec2(ImGui::GetContentRegionAvail().x * .75f, ImGui::GetFontSize() * 20)))
 				{
 					ImGui::TableSetupColumn("File");
 					ImGui::TableSetupColumn("Scheme");
 					ImGui::TableSetupColumn("Level");
-					ImGui::TableSetupColumn("Write Metadata?");
+					// ImGui::TableSetupColumn("Write Metadata?");
 					ImGui::TableSetupScrollFreeze(0, 1);
 					ImGui::TableHeadersRow();
 
@@ -244,8 +244,8 @@ int main(int argc, char** argv)
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
 
-						ImGui::TableNextColumn();
-						ImGui::CheckboxFlags(("##" + std::to_string(n)).c_str(), &FILE_LIST[n].compression_flags, 1);
+						// ImGui::TableNextColumn();
+						// ImGui::CheckboxFlags(("##" + std::to_string(n)).c_str(), &FILE_LIST[n].compression_flags, 1);
 						ImGui::PopID();
 					}
 

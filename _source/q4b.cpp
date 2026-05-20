@@ -206,9 +206,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 					// Other parameters are automatically set given the compression level (that would've been a huge headache otherwise)
 				}
 
-				ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
-				ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
-				ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
+				if (!file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
+				}
 
 				size_t compressed_size = CompressZstdData(cctx, file_data, file_header.uncompressed_size, &(compressed_files_data[i]));
 				file_header.compressed_size = compressed_size;

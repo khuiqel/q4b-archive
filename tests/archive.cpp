@@ -3,8 +3,10 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <bit> //std::popcount
 
 const std::filesystem::path TEST_ARCHIVE_PATH = "tests/test.q4b";
+const std::filesystem::path TEST_ARCHIVE_PATH_2 = "tests/test2.q4b";
 const std::filesystem::path TEST_FILE = "res/NotoSans-Regular.ttf";
 const std::filesystem::path TEST_FILE_2 = "res/../res/NotoSans-Regular.ttf"; //TODO: get another file
 const std::filesystem::path TEST_FILE_NONEXISTANT = "nope.txt";
@@ -142,6 +144,32 @@ TEST(WriteArchive, ThreeFilesDuplicateFail) {
 	EXPECT_TRUE(messages[1].severity == q4b::ErrorSeverity::error);
 }
 
+TEST(WriteArchive, ZstdMetadataSmaller) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH);
+	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+	}
+
+	std::vector<q4b::ErrorMessage> messages;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1 } };
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+
+	files[0].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH_2, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
+
+	// Verify the archive without metadata is smaller (TODO: specifically by 4 bytes?)
+	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), std::filesystem::file_size(TEST_ARCHIVE_PATH_2));
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+}
+
 TEST(ArchiveStructs, SetPath) {
 	q4b::ArchivedFileHeader file_header;
 	file_header.setPath("a");
@@ -205,6 +233,33 @@ TEST(ArchiveStructs, SetPathBackslash) {
 
 	file_header.path[0] = '\\';
 	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, CompressionFileFlags) {
+	// Test constructors
+	q4b::CompressionFile file1;
+	ASSERT_TRUE(file1.compression_flags == 0);
+	q4b::CompressionFile file2 = { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 };
+	ASSERT_TRUE(file2.compression_flags == 0);
+
+	// Test one flag set/unset
+	q4b::CompressionFile file3;
+	file3.setFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
+	ASSERT_TRUE(file3.compression_flags != 0);
+	EXPECT_TRUE(file3.getFlag((q4b::Q4B_CompressionFileFlags) 0b01000000));
+	EXPECT_TRUE(std::popcount(file3.compression_flags) == 1);
+	file3.unsetFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
+	ASSERT_TRUE(file3.compression_flags == 0);
+
+	// Test multiple flags
+	q4b::CompressionFile file4;
+	constexpr auto multi_flags = (q4b::Q4B_CompressionFileFlags) 0b01010110;
+	file4.setFlag(multi_flags);
+	EXPECT_TRUE(file4.compression_flags != 0);
+	EXPECT_TRUE(file4.getFlag(multi_flags)); // TODO: Call it getFlags()?
+	EXPECT_TRUE(std::popcount(file4.compression_flags) == 4);
+	file4.unsetFlag(multi_flags);
+	EXPECT_TRUE(file4.compression_flags == 0);
 }
 
 } // namespace
