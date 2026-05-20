@@ -139,7 +139,7 @@ int main(int argc, char** argv)
 		std::string root_folder = std::filesystem::current_path().generic_string(); // .generic_string() converts slashes on Windows
 		strncpy(root_file_path, root_folder.c_str(), root_folder.size());
 	}
-	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3, 1 });
+	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3 });
 
     // Main loop
     bool done = false;
@@ -168,7 +168,14 @@ int main(int argc, char** argv)
 				case SDL_EVENT_DROP_FILE:
 					if (rootDirIsLocked) {
 						std::filesystem::path path(event.drop.data);
-						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, gdata.zstd_level_num[gdata.zstd_level_idx], 1 });
+						int level;
+						switch ((q4b::CompressionScheme)gdata.compression_type_idx) {
+							default: [[fallthrough]];
+							case q4b::CompressionScheme::Uncompressed: level = 0;
+							case q4b::CompressionScheme::zstd: level = GuiData::zstd_level_num[gdata.zstd_level_idx];
+							case q4b::CompressionScheme::lz4:  level = GuiData::lz4_level_num[gdata.lz4_level_idx];
+						}
+						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, level });
 					}
 					break;
 			}
@@ -232,7 +239,7 @@ int main(int argc, char** argv)
 							ImGui::SetKeyboardFocusHere(-1);
 
 						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].compression_type));
+						ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].data.compression_type));
 
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
@@ -261,8 +268,8 @@ int main(int argc, char** argv)
 				if (ImGui::Button("Change Files")) {
 					for (int i = 0; i < ITEMS_COUNT; i++) {
 						if (selection.Contains((ImGuiID)i)) {
-							FILE_LIST[i].compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
-							switch (FILE_LIST[i].compression_type) {
+							FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
+							switch (FILE_LIST[i].data.compression_type) {
 								default: [[fallthrough]];
 								case q4b::CompressionScheme::Uncompressed:
 									FILE_LIST[i].compression_level = 0;

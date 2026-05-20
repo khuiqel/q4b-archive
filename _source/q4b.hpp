@@ -101,20 +101,25 @@ static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
 //note: this is for the application, the previous one is for the archive
 struct CompressionFile {
-	std::filesystem::path filepath;
-	CompressionScheme compression_type;
+	ArchivedFileHeader data;
 	int32_t compression_level;
-	int32_t compression_flags; //TODO
+	uint32_t compression_flags;
 
 	inline const char* getFilepath() const {
-		// This function exists because MSVC doesn't know how to convert std::filesystem::path::c_str() to a C-str
-		// HACK: use .c_str() on platforms that work, use .string().c_str() otherwise
-		// TODO: MSVC is still reading garbage, but it's correct garbage 99% of the time
-		#ifdef _WIN32
-		return (const char*) filepath.string().c_str();
-		#else
-		return (const char*) filepath.c_str();
-		#endif
+		return data.path;
+	}
+
+	CompressionFile() {
+		data.setPath("");
+		data.compression_type = CompressionScheme::Uncompressed;
+		compression_level = 0;
+		compression_flags = 0;
+	}
+	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
+		data.setPath(file);
+		data.compression_type = compression_type_;
+		compression_level = compression_level_;
+		compression_flags = 0;
 	}
 };
 

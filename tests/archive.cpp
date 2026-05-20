@@ -33,7 +33,7 @@ TEST(WriteArchive, OneFileUncompressed) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
@@ -48,7 +48,7 @@ TEST(WriteArchive, OneFileCompressedZstd) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
@@ -64,7 +64,7 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
@@ -79,7 +79,7 @@ TEST(WriteArchive, TwoFilesCompressedZstd) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1, 0 }, { TEST_FILE_2, q4b::CompressionScheme::zstd, 1, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1 }, { TEST_FILE_2, q4b::CompressionScheme::zstd, 1 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
@@ -97,7 +97,7 @@ TEST(WriteArchive, OneFileNonexistant) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
@@ -115,7 +115,7 @@ TEST(WriteArchive, SomeFilesExist) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
@@ -131,7 +131,7 @@ TEST(WriteArchive, ThreeFilesDuplicateFail) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure

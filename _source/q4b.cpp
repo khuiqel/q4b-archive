@@ -64,7 +64,7 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 	auto it = std::remove_if(file_list.begin(), file_list.end(),
 		[](const auto& file) {
 			std::error_code ec;
-			return !std::filesystem::exists(file.filepath, ec);
+			return !std::filesystem::exists(file.data.path, ec);
 		}
 	);
 	file_list.erase(it, file_list.end());
@@ -114,8 +114,12 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	{
 		bool allFilesExist = true;
 		for (int i = 0; i < file_list.size(); i++) {
-			if (!std::filesystem::exists(root_file_path / file_list[i].filepath)) {
-				messages->push_back({ ErrorSeverity::error, file_list[i].filepath.string() + " doesn't exist" });
+			if (!file_list[i].data.pathIsValid()) {
+				messages->push_back({ ErrorSeverity::error, "File idx " + std::to_string(i) + " is invalid" });
+				allFilesExist = false;
+				//TODO: maybe this function should copy file_list to prevent someone modifying the files
+			} else if (!std::filesystem::exists(root_file_path / file_list[i].data.path)) {
+				messages->push_back({ ErrorSeverity::error, std::string(file_list[i].data.path) + " doesn't exist" });
 				allFilesExist = false;
 			}
 		}
@@ -125,13 +129,17 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		}
 
 		bool duplicatesExist = false;
-		std::vector<CompressionFile> sorted_list(file_list);
+		std::vector<std::string> sorted_list; sorted_list.reserve(file_list.size());
+		std::transform(file_list.begin(), file_list.end(),
+			std::back_inserter(sorted_list),
+			[](const CompressionFile& file) { return file.data.path; }
+		);
 		std::sort(sorted_list.begin(), sorted_list.end(), [](const auto& lhs, const auto& rhs) {
-			return lhs.filepath < rhs.filepath;
+			return lhs < rhs;
 		});
 		for (int i = 1; i < file_list.size(); i++) {
-			if (sorted_list[i-1].filepath == sorted_list[i].filepath) {
-				messages->push_back({ ErrorSeverity::error, sorted_list[i].filepath.string() + " has a duplicate" });
+			if (sorted_list[i-1] == sorted_list[i]) {
+				messages->push_back({ ErrorSeverity::error, sorted_list[i] + " has a duplicate" });
 				duplicatesExist = true;
 			}
 		}
@@ -159,9 +167,9 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 		const CompressionFile& file = file_list[i];
 		char* file_data;
-		int64_t file_size = LoadFileIntoMemory(root_file_path / file.filepath, &file_data);
+		int64_t file_size = LoadFileIntoMemory(root_file_path / file.data.path, &file_data);
 		if (file_size == -1) [[unlikely]] {
-			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.filepath).string() + "\"" });
+			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.data.path).string() + "\"" });
 			for (int j = 0; j < i; j++) {
 				delete[] compressed_files_data[j];
 			}
@@ -170,14 +178,14 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		}
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		file_header.setPath(file.filepath);
-		file_header.compression_type = file.compression_type;
+		std::memcpy(file_header.path, file.data.path, Q4B_MAX_PATH);
+		file_header.compression_type = file.data.compression_type;
 		file_header.uncompressed_size = file_size;
 		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
 
-		switch (file.compression_type) {
+		switch (file.data.compression_type) {
 			default:
-				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.filepath).string() + "\": " + std::to_string((uint64_t)file.compression_type) });
+				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\": " + std::to_string((uint64_t)file.data.compression_type) });
 				file_header.compression_type = CompressionScheme::Uncompressed;
 				[[fallthrough]];
 			case CompressionScheme::Uncompressed: {
