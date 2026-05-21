@@ -169,12 +169,13 @@ int main(int argc, char** argv)
 					if (rootDirIsLocked) {
 						std::filesystem::path path(event.drop.data);
 						int level;
-						switch ((q4b::CompressionScheme)gdata.compression_type_idx) {
-							default: [[fallthrough]];
-							case q4b::CompressionScheme::Uncompressed: level = 0;
-							case q4b::CompressionScheme::zstd: level = GuiData::zstd_level_num[gdata.zstd_level_idx];
-							case q4b::CompressionScheme::lz4:  level = GuiData::lz4_level_num[gdata.lz4_level_idx];
-						}
+						//TODO
+						if (gdata.compression_type_idx == 1)
+							level = GuiData::lz4_level_num[gdata.lz4_level_idx];
+						else if (gdata.compression_type_idx == 2)
+							level = GuiData::zstd_level_num[gdata.zstd_level_idx];
+						else
+							level = 0;
 						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, level });
 					}
 					break;
@@ -198,294 +199,297 @@ int main(int argc, char** argv)
 
 		const bool THREAD_IS_WORKING = thread_func_working.load();
 		ImGui::Begin("Main Window", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
-		if (ImGui::BeginTabBar("MainTabBar", 0)) {
-			if (ImGui::BeginTabItem("Q4B Archiving")) {
-				if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
-				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
-				ImGui::Text("Drop files here");
+		if (ImGui::BeginTable("MainTable", 2, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_BordersInnerV)) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
 
-				const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-				static ImGui_ExampleSelectionWithDeletion selection;
-				selection.UserData = (void*)&FILE_LIST;
-				selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
+			if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
+			ImGui::TextUnformatted("Drop files here");
 
-				const int ITEMS_COUNT = FILE_LIST.size();
-				ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
-				if (ImGui::BeginTable("Selection", 3, table_flags, ImVec2(ImGui::GetContentRegionAvail().x * .75f, ImGui::GetFontSize() * 20)))
+			const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+			static ImGui_ExampleSelectionWithDeletion selection;
+			selection.UserData = (void*)&FILE_LIST;
+			selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
+
+			const int ITEMS_COUNT = FILE_LIST.size();
+			ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
+			if (ImGui::BeginTable("Selection", 3, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
+				ImGui::TableSetupColumn("File");
+				ImGui::TableSetupColumn("Scheme");
+				ImGui::TableSetupColumn("Level");
+				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableHeadersRow();
+
+				const ImGuiMultiSelectFlags selection_flags = ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
+				ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(selection_flags, selection.Size, ITEMS_COUNT);
+				selection.ApplyRequests(ms_io);
+
+				const bool want_delete = ImGui::Shortcut(ImGuiKey_Delete, ImGuiInputFlags_Repeat) && (selection.Size > 0);
+				const int item_curr_idx_to_focus = want_delete ? selection.ApplyDeletionPreLoop(ms_io, ITEMS_COUNT) : -1;
+
+				for (int n = 0; n < ITEMS_COUNT; n++)
 				{
-					ImGui::TableSetupColumn("File");
-					ImGui::TableSetupColumn("Scheme");
-					ImGui::TableSetupColumn("Level");
-					// ImGui::TableSetupColumn("Write Metadata?");
-					ImGui::TableSetupScrollFreeze(0, 1);
-					ImGui::TableHeadersRow();
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::PushID(n);
+					bool item_is_selected = selection.Contains((ImGuiID)n);
+					ImGui::SetNextItemSelectionUserData(n);
+					ImGui::Selectable(FILE_LIST[n].getFilepath(), &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
+					if (item_curr_idx_to_focus == n)
+						ImGui::SetKeyboardFocusHere(-1);
 
-					const ImGuiMultiSelectFlags selection_flags = ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
-					ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(selection_flags, selection.Size, ITEMS_COUNT);
-					selection.ApplyRequests(ms_io);
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].data.compression_type));
 
-					const bool want_delete = ImGui::Shortcut(ImGuiKey_Delete, ImGuiInputFlags_Repeat) && (selection.Size > 0);
-					const int item_curr_idx_to_focus = want_delete ? selection.ApplyDeletionPreLoop(ms_io, ITEMS_COUNT) : -1;
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
 
-					for (int n = 0; n < ITEMS_COUNT; n++)
-					{
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::PushID(n);
-						bool item_is_selected = selection.Contains((ImGuiID)n);
-						ImGui::SetNextItemSelectionUserData(n);
-						ImGui::Selectable(FILE_LIST[n].getFilepath(), &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
-						if (item_curr_idx_to_focus == n)
-							ImGui::SetKeyboardFocusHere(-1);
-
-						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].data.compression_type));
-
-						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
-
-						// ImGui::TableNextColumn();
-						// ImGui::CheckboxFlags(("##" + std::to_string(n)).c_str(), &FILE_LIST[n].compression_flags, 1);
-						ImGui::PopID();
-					}
-
-					ms_io = ImGui::EndMultiSelect();
-					selection.ApplyRequests(ms_io);
-					if (want_delete)
-						selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
-					ImGui::EndTable();
+					ImGui::PopID();
 				}
-				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
-				ImGui::SeparatorText("Change");
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
-				ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
-				ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
-				ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
-				ImGui::PopItemWidth();
+				ms_io = ImGui::EndMultiSelect();
+				selection.ApplyRequests(ms_io);
+				if (want_delete)
+					selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
+				ImGui::EndTable();
+			}
+			if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
-				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
-				if (ImGui::Button("Change Files")) {
-					for (int i = 0; i < ITEMS_COUNT; i++) {
-						if (selection.Contains((ImGuiID)i)) {
-							FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
-							switch (FILE_LIST[i].data.compression_type) {
-								default: [[fallthrough]];
-								case q4b::CompressionScheme::Uncompressed:
-									FILE_LIST[i].compression_level = 0;
-									break;
+			ImGui::TableSetColumnIndex(1);
 
-								case q4b::CompressionScheme::zstd:
-									FILE_LIST[i].compression_level = GuiData::zstd_level_num[gdata.zstd_level_idx];
-									break;
-								case q4b::CompressionScheme::lz4:
-									FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
-									break;
+			if (ImGui::BeginTabBar("MainTabBar", 0)) {
+				if (ImGui::BeginTabItem("Q4B Archiving")) {
+					if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
+
+					ImGui::SeparatorText("Change");
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+					ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
+					ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
+					ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
+					ImGui::PopItemWidth();
+
+					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("Change Files")) {
+						for (int i = 0; i < ITEMS_COUNT; i++) {
+							if (selection.Contains((ImGuiID)i)) {
+								FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
+								switch (FILE_LIST[i].data.compression_type) {
+									default: [[fallthrough]];
+									case q4b::CompressionScheme::Uncompressed:
+										FILE_LIST[i].compression_level = 0;
+										break;
+
+									case q4b::CompressionScheme::zstd:
+										FILE_LIST[i].compression_level = GuiData::zstd_level_num[gdata.zstd_level_idx];
+										break;
+									case q4b::CompressionScheme::lz4:
+										FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
+										break;
+								}
 							}
 						}
 					}
-				}
-				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
+					if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
-				ImGui::SeparatorText("Configuration");
-				if (ImGui::Button(rootDirIsLocked ? "Unlock" : "Lock", { ImGui::CalcTextSize("Unlock").x + 2*style.FramePadding.x, 0.0f })) {
-					if (rootDirIsLocked) {
-						FILE_LIST.clear();
+					ImGui::SeparatorText("Configuration");
+					if (ImGui::Button(rootDirIsLocked ? "Unlock" : "Lock", { ImGui::CalcTextSize("Unlock").x + 2*style.FramePadding.x, 0.0f })) {
+						if (rootDirIsLocked) {
+							FILE_LIST.clear();
+						}
+						rootDirIsLocked = !rootDirIsLocked;
 					}
-					rootDirIsLocked = !rootDirIsLocked;
-				}
-				ImGui::SameLine();
-				if (rootDirIsLocked) { ImGui::BeginDisabled(); }
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-				ImGui::InputText("Root folder", root_file_path, IM_COUNTOF(root_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
-				ImGui::PopItemWidth();
-				if (rootDirIsLocked) { ImGui::EndDisabled(); }
+					ImGui::SameLine();
+					if (rootDirIsLocked) { ImGui::BeginDisabled(); }
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+					ImGui::InputText("Root folder", root_file_path, IM_COUNTOF(root_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+					ImGui::PopItemWidth();
+					if (rootDirIsLocked) { ImGui::EndDisabled(); }
 
-				static constexpr uint32_t threadMin = 1;
-				ImGui::SliderScalar("Thread count", ImGuiDataType_S32, &gdata.threadCount, &threadMin, &GuiData::threadCountMax);
-				//TODO: another thread count for how many workers to create; the one above is how many helper threads each worker thread gets
+					static constexpr int32_t threadMin = 1;
+					ImGui::SliderScalar("Thread count", ImGuiDataType_S32, &gdata.threadCount, &threadMin, &GuiData::threadCountMax);
+					//TODO: another thread count for how many workers to create; the one above is how many helper threads each worker thread gets
 
-				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
-				if (ImGui::Button("Prune Existence")) {
-					q4b::ExistencePrune(FILE_LIST);
-				}
-				if (ImGui::BeginItemTooltip()) {
-					ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-					ImGui::TextUnformatted("Remove files that no longer exist");
-					ImGui::PopTextWrapPos();
-					ImGui::EndTooltip();
-				}
-				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
-				if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
-
-				ImGui::SeparatorText("Create");
-				if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-				ImGui::InputText("Archive name", archive_file_path, IM_COUNTOF(archive_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
-				ImGui::PopItemWidth();
-				if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
-
-				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
-				if (THREAD_IS_WORKING) {
-					const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
-					const float progress = float(files_completed) / float(FILE_LIST.size());
-					char buf[32];
-					sprintf(buf, "%u/%zu", files_completed, FILE_LIST.size());
-					ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), buf);
-
-					const bool EXIT_EARLY = thread_func_exit_early.load(std::memory_order_acquire);
-					if (EXIT_EARLY) { ImGui::BeginDisabled(); }
-					if (ImGui::Button("Cancel")) {
-						thread_func_exit_early.store(true);
+					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("Prune Existence")) {
+						q4b::ExistencePrune(FILE_LIST);
 					}
-					if (EXIT_EARLY) { ImGui::EndDisabled(); }
-				} else {
-					if (ImGui::Button("Create Archive")) {
-						gdata.messages.clear();
-						thread_func_working.store(true);
-						thread_func_exit_early.store(false);
-						thread_files_completed.store(0);
-						std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, gdata.threadCount, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
-						t.detach();
-						//TODO: should probably make a global thread instead of re-creating one
+					if (ImGui::BeginItemTooltip()) {
+						ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+						ImGui::TextUnformatted("Remove files that no longer exist");
+						ImGui::PopTextWrapPos();
+						ImGui::EndTooltip();
 					}
-				}
-				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
+					if (!rootDirIsLocked) { ImGui::EndDisabled(); }
+					if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 
-				ImGui::EndTabItem();
-			}
+					ImGui::SeparatorText("Create");
+					if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+					ImGui::InputText("Archive name", archive_file_path, IM_COUNTOF(archive_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+					ImGui::PopItemWidth();
+					if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 
-			if (ImGui::BeginTabItem("Q4B Unpacking")) {
-				ImGui::TextUnformatted("TODO");
+					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
+					if (THREAD_IS_WORKING) {
+						const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
+						const float progress = float(files_completed) / float(FILE_LIST.size());
+						char buf[32];
+						sprintf(buf, "%u/%zu", files_completed, FILE_LIST.size());
+						ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), buf);
 
-				if (ImGui::Button("Preview Archive")) {
-					//TODO: select which ones to unpack
-				}
-
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
-				ImGui::InputText("Output folder", output_file_path, IM_COUNTOF(output_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
-				ImGui::PopItemWidth();
-
-				if (ImGui::Button("Decode Archive")) {
-					q4b::DecodeArchive(archive_file_path, output_file_path);
-				}
-
-				if (ImGui::Button("Read Archive Header")) {
-					gdata.viewingArchiveFileList.clear();
-					q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
-					gdata.viewingArchive = true;
-				}
-
-				//TODO: select these files for decompression
-				if (gdata.viewingArchive) {
-					if (ImGui::Button("Stop Viewing")) {
-						gdata.viewingArchive = false;
+						const bool EXIT_EARLY = thread_func_exit_early.load(std::memory_order_acquire);
+						if (EXIT_EARLY) { ImGui::BeginDisabled(); }
+						if (ImGui::Button("Cancel")) {
+							thread_func_exit_early.store(true);
+						}
+						if (EXIT_EARLY) { ImGui::EndDisabled(); }
+					} else {
+						if (ImGui::Button("Create Archive")) {
+							gdata.messages.clear();
+							thread_func_working.store(true);
+							thread_func_exit_early.store(false);
+							thread_files_completed.store(0);
+							std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, gdata.threadCount, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+							t.detach();
+							//TODO: should probably make a global thread instead of re-creating one
+						}
 					}
-					const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-					if (ImGui::BeginTable("table1", 4, table_flags)) {
-						ImGui::TableSetupColumn("File");
-						ImGui::TableSetupColumn("Scheme");
-						ImGui::TableSetupColumn("Compressed Size");
-						ImGui::TableSetupColumn("Uncompressed Size");
-						ImGui::TableHeadersRow();
+					if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0);
-						ImGui::Text(gdata.viewingArchiveHeader.magic);
-						ImGui::TableNextColumn();
-						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.flags).c_str());
-						ImGui::TableNextColumn();
-						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.version).c_str());
-						ImGui::TableNextColumn();
-						ImGui::Text(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
+					ImGui::EndTabItem();
+				}
 
-						for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
+				if (ImGui::BeginTabItem("Q4B Unpacking")) {
+					ImGui::TextUnformatted("TODO");
+
+					if (ImGui::Button("Preview Archive")) {
+						//TODO: select which ones to unpack
+					}
+
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+					ImGui::InputText("Output folder", output_file_path, IM_COUNTOF(output_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+					ImGui::PopItemWidth();
+
+					if (ImGui::Button("Decode Archive")) {
+						q4b::DecodeArchive(archive_file_path, output_file_path);
+					}
+
+					if (ImGui::Button("Read Archive Header")) {
+						gdata.viewingArchiveFileList.clear();
+						q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
+						gdata.viewingArchive = true;
+					}
+
+					//TODO: select these files for decompression
+					if (gdata.viewingArchive) {
+						if (ImGui::Button("Stop Viewing")) {
+							gdata.viewingArchive = false;
+						}
+						const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+						if (ImGui::BeginTable("table1", 4, table_flags)) {
+							ImGui::TableSetupColumn("File");
+							ImGui::TableSetupColumn("Scheme");
+							ImGui::TableSetupColumn("Compressed Size");
+							ImGui::TableSetupColumn("Uncompressed Size");
+							ImGui::TableHeadersRow();
+
 							ImGui::TableNextRow();
 							ImGui::TableSetColumnIndex(0);
-							ImGui::Text(file_header.path);
+							ImGui::TextUnformatted(gdata.viewingArchiveHeader.magic);
 							ImGui::TableNextColumn();
-							ImGui::Text(q4b::CompressionToStr(file_header.compression_type));
+							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.flags).c_str());
 							ImGui::TableNextColumn();
-							ImGui::Text(std::to_string(file_header.compressed_size).c_str());
+							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.version).c_str());
 							ImGui::TableNextColumn();
-							ImGui::Text(std::to_string(file_header.uncompressed_size).c_str());
+							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
+
+							for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
+								ImGui::TableNextRow();
+								ImGui::TableSetColumnIndex(0);
+								ImGui::TextUnformatted(file_header.path);
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(q4b::CompressionToStr(file_header.compression_type));
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
+							}
+							ImGui::EndTable();
 						}
-						ImGui::EndTable();
 					}
+
+					ImGui::EndTabItem();
 				}
 
-				ImGui::EndTabItem();
+				if (ImGui::BeginTabItem("Quick Compression")) {
+					if (ImGui::Button("Create q4b-gui.zstd (TODO)")) {
+						//q4b::compressZstdFile(argv[0], std::string(argv[0]) + ".zstd");
+					}
+					if (ImGui::Button("Decompress q4b-gui.zstd (TODO)")) {
+						//q4b::decompressZstdFile(std::string(argv[0]) + ".zstd", std::string(argv[0]) + "-decompressed");
+					}
+
+					//TODO: this needs to do an lz4 frame, not block
+					if (ImGui::Button("Create q4b-gui.lz4 (TODO)")) {
+						//q4b::compressLz4File(argv[0], std::string(argv[0]) + ".lz4");
+					}
+					if (ImGui::Button("Decompress q4b-gui.lz4 (TODO)")) {
+						//q4b::decompressLz4File(std::string(argv[0]) + ".lz4", std::string(argv[0]) + "-decompressed", std::filesystem::file_size(argv[0]));
+					}
+
+					if (ImGui::Button("Prune Existence")) {
+						q4b::ExistencePrune(FILE_LIST);
+					}
+
+					ImGui::EndTabItem();
+				}
+
+				/*
+				if (ImGui::BeginTabItem("Help")) {
+					//TODO: information for each compression format (and q4b)
+					ImGui::EndTabItem();
+				}
+				*/
+
+				if (ImGui::BeginTabItem("About")) {
+					ImGui::Text("License: GNU General Public License v3.0");
+					ImGui::Text("SPDX-License-Identifier: GPL-3.0-only");
+					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+					ImGui::TextLinkOpenURL("GitHub link", "https://github.com/khuiqel/q4b-archive");
+
+					// #ifndef NDEBUG
+					ImGui::Checkbox("Demo Window", &show_demo_window);
+					// #endif
+
+					// ImGui::NewLine();
+					//TODO: enabled modules (zstd, lz4, others)
+
+					ImGui::NewLine();
+					if (ImGui::TreeNodeEx("Extra Buttons", ImGuiTreeNodeFlags_FramePadding)) {
+						if (ImGui::Button("Toggle window decorations (title bar & outline)")) {
+							SDL_SetWindowBordered(window, (SDL_GetWindowFlags(window) & SDL_WINDOW_BORDERLESS));
+						}
+						if (ImGui::Button("Maximize window")) {
+							SDL_MaximizeWindow(window);
+						}
+						if (ImGui::Button("Un-maximize window")) {
+							SDL_RestoreWindow(window);
+						}
+						if (ImGui::Button("Minimize window")) {
+							SDL_MinimizeWindow(window);
+						}
+						ImGui::TreePop();
+					}
+					if (ImGui::Button("Close Application")) {
+						done = true;
+					}
+					ImGui::EndTabItem();
+				}
+
+				ImGui::EndTabBar();
 			}
 
-			if (ImGui::BeginTabItem("Quick Compression")) {
-				ImGui::Text("Drop files here");
-				//shares the same list as the archiving window
-
-				if (ImGui::Button("Create q4b-gui.zstd (TODO)")) {
-					//q4b::compressZstdFile(argv[0], std::string(argv[0]) + ".zstd");
-				}
-				if (ImGui::Button("Decompress q4b-gui.zstd (TODO)")) {
-					//q4b::decompressZstdFile(std::string(argv[0]) + ".zstd", std::string(argv[0]) + "-decompressed");
-				}
-
-				//TODO: this needs to do an lz4 frame, not block
-				if (ImGui::Button("Create q4b-gui.lz4 (TODO)")) {
-					//q4b::compressLz4File(argv[0], std::string(argv[0]) + ".lz4");
-				}
-				if (ImGui::Button("Decompress q4b-gui.lz4 (TODO)")) {
-					//q4b::decompressLz4File(std::string(argv[0]) + ".lz4", std::string(argv[0]) + "-decompressed", std::filesystem::file_size(argv[0]));
-				}
-
-				if (ImGui::Button("Prune Existence")) {
-					q4b::ExistencePrune(FILE_LIST);
-				}
-
-				ImGui::EndTabItem();
-			}
-
-			/*
-			if (ImGui::BeginTabItem("Help")) {
-				//TODO: information for each compression format (and q4b)
-				ImGui::EndTabItem();
-			}
-			*/
-
-			if (ImGui::BeginTabItem("About")) {
-				ImGui::Text("License: GNU General Public License v3.0");
-				ImGui::Text("SPDX-License-Identifier: GPL-3.0-only");
-				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-				ImGui::TextLinkOpenURL("GitHub link", "https://github.com/khuiqel/q4b-archive");
-
-				// #ifndef NDEBUG
-				ImGui::Checkbox("Demo Window", &show_demo_window);
-				// #endif
-
-				// ImGui::NewLine();
-				//TODO: enabled modules (zstd, lz4, others)
-
-				ImGui::NewLine();
-				if (ImGui::TreeNodeEx("Extra Buttons", ImGuiTreeNodeFlags_FramePadding)) {
-					if (ImGui::Button("Toggle window decorations (title bar & outline)")) {
-						SDL_SetWindowBordered(window, (SDL_GetWindowFlags(window) & SDL_WINDOW_BORDERLESS));
-					}
-					if (ImGui::Button("Maximize window")) {
-						SDL_MaximizeWindow(window);
-					}
-					if (ImGui::Button("Un-maximize window")) {
-						SDL_RestoreWindow(window);
-					}
-					if (ImGui::Button("Minimize window")) {
-						SDL_MinimizeWindow(window);
-					}
-					ImGui::TreePop();
-				}
-				if (ImGui::Button("Close Application")) {
-					done = true;
-				}
-				ImGui::EndTabItem();
-			}
-
-			ImGui::EndTabBar();
+			ImGui::EndTable();
 		}
 		ImGui::End();
 
