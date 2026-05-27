@@ -77,19 +77,19 @@ static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_chainLog,         ZSTD_cParam_getBounds(ZSTD_c_chainLog).upperBound);
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_hashLog,          ZSTD_cParam_getBounds(ZSTD_c_hashLog).upperBound);
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_searchLog,        ZSTD_cParam_getBounds(ZSTD_c_searchLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_minMatch,         ZSTD_cParam_getBounds(ZSTD_c_minMatch).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_minMatch,         ZSTD_cParam_getBounds(ZSTD_c_minMatch).lowerBound); // lowerBound
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_targetLength,     ZSTD_cParam_getBounds(ZSTD_c_targetLength).upperBound);
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_strategy,         ZSTD_cParam_getBounds(ZSTD_c_strategy).upperBound);
 
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_overlapLog,       ZSTD_cParam_getBounds(ZSTD_c_overlapLog).upperBound);
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashLog,       ZSTD_cParam_getBounds(ZSTD_c_ldmHashLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashRateLog,   ZSTD_cParam_getBounds(ZSTD_c_ldmHashRateLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmMinMatch,      ZSTD_cParam_getBounds(ZSTD_c_ldmMinMatch).upperBound);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashRateLog,   0);
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmMinMatch,      16);
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmBucketSizeLog, ZSTD_cParam_getBounds(ZSTD_c_ldmBucketSizeLog).upperBound);
 
-	// Setting ZSTD_c_enableLongDistanceMatching doesn't seem to be necessary (auto-set by windowLog and strategy)
-	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_enableLongDistanceMatching, ZSTD_cParam_getBounds(ZSTD_c_enableLongDistanceMatching).upperBound);
-	// TODO: Is compression level needed?
+	// Setting ZSTD_c_enableLongDistanceMatching is *sometimes* necessary, despite claiming to be auto-set by windowLog and strategy
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_enableLongDistanceMatching, 1);
+	// Does not appear necessary to set the compression level
 	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, ZSTD_maxCLevel());
 }
 
