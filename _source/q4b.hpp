@@ -238,34 +238,34 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 /* Compresses data in memory using LZ4. Returns the size of the compressed data, as a LZ4 block (meaning no metadata).
  *
  * @param file_data [in] The file in memory.
- * @param uncompressed_size [in] The file's size.
- * @param compression_level [in] LZ4 compression level to use. (TODO: not used currently)
+ * @param uncompressed_size [in] The file's size. NOTE: LZ4 has a limit of ~2GB (LZ4_MAX_INPUT_SIZE).
  * @param compressed_file [out] The pointer for where the compressed data will be put.
+ * @param compression_level [in] LZ4 compression level to use.
  *
  * @return Size of the compressed data. -1 if it failed (TODO). Allocated memory will be >= the compressed size.
  */
-[[nodiscard]] size_t CompressLz4Data(const void* file_data, size_t uncompressed_size, int compression_level, char** compressed_file) noexcept;
+[[nodiscard]] int CompressLz4Data(const void* file_data, int uncompressed_size, char** compressed_file, int compression_level) noexcept;
 
 /* Decompresses data in memory using Zstd. Returns the decompressed size.
  *
  * @param file_data [in] The file in memory.
  * @param compressed_size [in] The file's size.
  * @param decompressed_file [out] The pointer for where the compressed data will be put.
- * @param decompressed_file_size [out] The size of the decompressed data. This function was made to read Zstd blocks, so there is no frame to grab the size from.
+ * @param decompressed_size [in] The size of the decompressed data. This function was made to read Zstd blocks, so there is no frame to grab the size from.
  *
  * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
  */
-[[nodiscard]] size_t DecompressZstdData(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept;
+[[nodiscard]] size_t DecompressZstdData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
 
 /* Decompresses data in memory using LZ4.
  *
  * @param file_data [in] The file in memory.
  * @param compressed_size [in] The file's size.
  * @param decompressed_file [out] The pointer for where the compressed data will be put.
- * @param decompressed_file_size [out] The size of the decompressed data. This function was made to read LZ4 blocks, so there is no frame to grab the size from.
+ * @param decompressed_size [in] The size of the decompressed data. This function was made to read LZ4 blocks, so there is no frame to grab the size from.
  *
  * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
  */
-[[nodiscard]] size_t DecompressLz4Data(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept;
+[[nodiscard]] int DecompressLz4Data(const void* file_data, int compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
 
 } // namespace q4b

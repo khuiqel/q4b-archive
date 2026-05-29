@@ -6,8 +6,7 @@
 #include <algorithm>
 
 #include <zstd.h>
-#include <lz4.h>
-#include <lz4frame.h>
+#include <lz4hc.h>
 
 namespace q4b {
 
@@ -185,7 +184,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 		switch (file.data.compression_type) {
 			default:
-				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\": " + std::to_string((uint64_t)file.data.compression_type) });
+				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
 				file_header.compression_type = CompressionScheme::Uncompressed;
 				[[fallthrough]];
 			case CompressionScheme::Uncompressed: {
@@ -206,7 +205,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 					// Other parameters are automatically set given the compression level (that would've been a huge headache otherwise)
 				}
 
-				if (!file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 1); // Default already 1
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
+					ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
+				} else {
 					ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
 					ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
 					ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
@@ -222,7 +225,20 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 			}
 
 			case CompressionScheme::lz4: {
-				size_t compressed_size = CompressLz4Data(file_data, file_header.uncompressed_size, file.compression_level, &(compressed_files_data[i]));
+				/*
+				LZ4F_preferences_t prefs = {}; // LZ4F_INIT_PREFERENCES will set to the defaults, but 0 is also interpreted as default
+				prefs.compressionLevel = file.compression_level;
+				// prefs.frameInfo.contentSize = file_header.uncompressed_size; // This writes 8 extra bytes
+				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+					prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+				} else {
+					prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum; // Default already 0
+					prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum; // Default already 0
+				}
+				*/
+
+				int compressed_size = CompressLz4Data(file_data, file_header.uncompressed_size, &(compressed_files_data[i]), file.compression_level);
 				file_header.compressed_size = compressed_size;
 				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
 				delete[] file_data;
@@ -489,30 +505,27 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) n
 
 size_t CompressZstdData(void* cctx, const void* file_data, size_t uncompressed_size, char** compressed_file) noexcept {
 	size_t compressedBufSize = ZSTD_compressBound(uncompressed_size);
-	*compressed_file =  new char[compressedBufSize];
+	*compressed_file = new char[compressedBufSize];
 	size_t compressedSize = ZSTD_compress2((ZSTD_CCtx*)cctx, *compressed_file, compressedBufSize, file_data, uncompressed_size);
 	return compressedSize;
 }
 
-size_t CompressLz4Data(const void* file_data, size_t uncompressedSize, int compression_level, char** compressed_file) noexcept {
-	(void)compression_level; //TODO
-	size_t compressedBufSize = LZ4_compressBound(uncompressedSize);
-	*compressed_file =  new char[compressedBufSize];
-	size_t compressedSize = LZ4_compress_default((const char*)file_data, (char*)(*compressed_file), uncompressedSize, compressedBufSize);
+int CompressLz4Data(const void* file_data, int uncompressedSize, char** compressed_file, int compression_level) noexcept {
+	int compressedBufSize = LZ4_compressBound(uncompressedSize);
+	*compressed_file = new char[compressedBufSize];
+	int compressedSize = LZ4_compress_HC((const char*)file_data, *compressed_file, uncompressedSize, compressedBufSize, compression_level);
 	return compressedSize;
 }
 
-size_t DecompressZstdData(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
-	// size_t decompressedBufSize = ZSTD_getFrameContentSize(file_data, compressed_file_size); // ZSTD_decompressBound()
-	*decompressed_file = new char[decompressed_file_size];
-	size_t decompressedSize = ZSTD_decompress(*decompressed_file, decompressed_file_size, file_data, compressed_file_size);
+size_t DecompressZstdData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
+	*decompressed_file = new char[decompressed_size];
+	size_t decompressedSize = ZSTD_decompress(*decompressed_file, decompressed_size, file_data, compressed_size);
 	return decompressedSize;
 }
 
-size_t DecompressLz4Data(const void* file_data, size_t compressed_file_size, char** decompressed_file, size_t decompressed_file_size) noexcept {
-	// size_t decompressedBufSize = ZSTD_getFrameContentSize(file_data, compressed_file_size); // (LZ4 generates blocks by default, not frames)
-	*decompressed_file = new char[decompressed_file_size];
-	size_t decompressedSize = LZ4_decompress_safe((const char*)file_data, (char*)(*decompressed_file), compressed_file_size, decompressed_file_size);
+int DecompressLz4Data(const void* file_data, int compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
+	*decompressed_file = new char[decompressed_size];
+	int decompressedSize = LZ4_decompress_safe((const char*)file_data, *decompressed_file, compressed_size, decompressed_size);
 	return decompressedSize;
 }
 

@@ -56,13 +56,19 @@ void GuiData::Initialize() {
 
 	for (int i = 1; i <= LZ4F_compressionLevel_max(); i++) {
 		std::string level = std::to_string(i);
+		if (i == 1) { // LZ4_CLEVEL_DEFAULT
+			level += " (CLI default)";
+			lz4_level_default_idx = lz4_level_arr.size();
+			// Note: level 1 and 2 are identical, see k_clTable in lz4hc.c
+		} else if (i == 9) { // LZ4HC_CLEVEL_DEFAULT
+			level += " (HC default)";
+		}
 		char* level_str = new char[level.size()+1];
 		std::copy(level.begin(), level.end(), level_str);
 		level_str[level.size()] = '\0';
 		lz4_level_arr.push_back(level_str);
 		lz4_level_num.push_back(i);
 	}
-	lz4_level_default_idx = 0;
 
 	lz4_level_arr.shrink_to_fit();
 	lz4_level_num.shrink_to_fit();

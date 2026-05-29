@@ -75,9 +75,12 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
-TEST(WriteArchive, TwoFilesCompressedZstd) {
+TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
+	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
@@ -88,7 +91,15 @@ TEST(WriteArchive, TwoFilesCompressedZstd) {
 	// Assume Zstd can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE) + std::filesystem::file_size(TEST_FILE_2));
 
+	files[1].data.compression_type = q4b::CompressionScheme::lz4;
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH_2, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
+	// Assume LZ4 compresses the test file less than Zstd
+	EXPECT_GT(std::filesystem::file_size(TEST_ARCHIVE_PATH_2), std::filesystem::file_size(TEST_ARCHIVE_PATH));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
 
 TEST(WriteArchive, OneFileNonexistant) {
@@ -169,6 +180,34 @@ TEST(WriteArchive, ZstdMetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
+
+#if 0
+TEST(WriteArchive, Lz4MetadataSmaller) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH);
+	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+	}
+
+	std::vector<q4b::ErrorMessage> messages;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::lz4, 1 } };
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+
+	files[0].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH_2, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
+
+	// Verify the archive without metadata is smaller (TODO: specifically by 4 bytes?)
+	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), std::filesystem::file_size(TEST_ARCHIVE_PATH_2));
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+}
+#endif
 
 TEST(ArchiveStructs, SetPath) {
 	q4b::ArchivedFileHeader file_header;
