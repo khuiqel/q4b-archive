@@ -29,7 +29,7 @@ constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 0);
 constexpr int Q4B_MAX_PATH = 256;
 constexpr char MAGIC_NUM[8] = "Q4B_YAY";
 
-enum class CompressionScheme : uint64_t {
+enum class CompressionScheme : uint32_t {
 	Uncompressed = 0,
 	lz4,
 	zstd,
@@ -81,8 +81,14 @@ struct ArchiveHeader {
 static_assert(sizeof(ArchiveHeader) == (8+4+4+8+8));
 static_assert(std::is_trivially_copyable<ArchiveHeader>::value);
 
+enum class Q4B_ArchivedFileFlags : uint32_t {
+	None                         = 0,
+	MetadataEmbedded             = 1 << 0,
+};
+
 struct ArchivedFileHeader {
 	char path[Q4B_MAX_PATH];
+	uint32_t flags;
 	CompressionScheme compression_type;
 	uint64_t compressed_size;
 	uint64_t uncompressed_size;
@@ -91,10 +97,14 @@ struct ArchivedFileHeader {
 	XXH64_hash_t uncompressed_hash;
 	//TODO: self_hash?
 
+	inline void setFlag(Q4B_ArchivedFileFlags flag) { flags |= static_cast<uint32_t>(flag); }
+	inline void unsetFlag(Q4B_ArchivedFileFlags flag) { flags &= ~static_cast<uint32_t>(flag); }
+	inline bool getFlag(Q4B_ArchivedFileFlags flag) const { return flags & static_cast<uint32_t>(flag); }
+
 	bool pathIsValid() const; // Returns true for: 1. no backslashes; 2. last byte in array is \0 (to be able to make it a string); 3. end of string to end of array is \0 //TODO: another function to check for NTFS-invalid characters
 	void setPath(const std::filesystem::path& path); // Writes the path, replacing backslashes and filling the remainder of the array with \0
 };
-static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+8+8+8+8+8));
+static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
 //TODO: remember to dump in LE!
@@ -122,12 +132,14 @@ struct CompressionFile {
 	CompressionFile() {
 		data.setPath("");
 		data.compression_type = CompressionScheme::Uncompressed;
+		data.flags = 0;
 		compression_level = 0;
 		compression_flags = 0;
 	}
 	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
 		data.setPath(file);
 		data.compression_type = compression_type_;
+		data.flags = 0;
 		compression_level = compression_level_;
 		compression_flags = 0;
 	}
@@ -224,7 +236,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  */
 [[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept;
 
-/* Compresses data in memory using Zstd. Returns the size of the compressed data, as a Zstd block (meaning no metadata). (TODO: for now it's a frame, so there is metadata)
+/* Compresses data in memory using Zstd. Returns the size of the compressed data, including its frame metadata if requested.
  *
  * @param cctx [in] The Zstd context. Will be cast from void* to ZSTD_CCtx*.
  * @param file_data [in] The file in memory.
@@ -235,6 +247,17 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  */
 [[nodiscard]] size_t CompressZstdData(void* cctx, const void* file_data, size_t uncompressed_size, char** compressed_file) noexcept;
 
+/* Decompresses data in memory using Zstd. Returns the decompressed size.
+ *
+ * @param file_data [in] The file in memory.
+ * @param compressed_size [in] The file's size.
+ * @param decompressed_file [out] The pointer for where the compressed data will be put.
+ * @param decompressed_size [in] The size of the decompressed data. This function was made to read Zstd blocks, so there is no frame to grab the size from. (Can decompress frames though.)
+ *
+ * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
+ */
+[[nodiscard]] size_t DecompressZstdData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
+
 /* Compresses data in memory using LZ4. Returns the size of the compressed data, as a LZ4 block (meaning no metadata).
  *
  * @param file_data [in] The file in memory.
@@ -243,21 +266,23 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  * @param compression_level [in] LZ4 compression level to use.
  *
  * @return Size of the compressed data. -1 if it failed (TODO). Allocated memory will be >= the compressed size.
+ *         NOTE: This returns a wildly different size from CompressLz4Data_Metadata() because they use different functions.
  */
 [[nodiscard]] int CompressLz4Data(const void* file_data, int uncompressed_size, char** compressed_file, int compression_level) noexcept;
 
-/* Decompresses data in memory using Zstd. Returns the decompressed size.
+/* Compresses data in memory using LZ4. Returns the size of the compressed data, as a LZ4 frame (meaning there's metadata).
  *
+ * @param prefs [in] The LZ4F preferences. Will be cast from void* to LZ4F_preferences_t*.
  * @param file_data [in] The file in memory.
- * @param compressed_size [in] The file's size.
- * @param decompressed_file [out] The pointer for where the compressed data will be put.
- * @param decompressed_size [in] The size of the decompressed data. This function was made to read Zstd blocks, so there is no frame to grab the size from.
+ * @param uncompressed_size [in] The file's size. NOTE: LZ4 has a limit of ~2GB (LZ4_MAX_INPUT_SIZE)... however, it doesn't appear LZ4 frames have the same limitation.
+ * @param compressed_file [out] The pointer for where the compressed data will be put.
  *
- * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
+ * @return Size of the compressed data. -1 if it failed (TODO). Allocated memory will be >= the compressed size.
+ *         NOTE: This returns a wildly different size from CompressLz4Data() because they use different functions.
  */
-[[nodiscard]] size_t DecompressZstdData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
+[[nodiscard]] size_t CompressLz4Data_Metadata(const void* prefs, const void* file_data, size_t uncompressed_size, char** compressed_file) noexcept;
 
-/* Decompresses data in memory using LZ4.
+/* Decompresses data in memory using LZ4. Only works for LZ4 blocks (meaning no metadata).
  *
  * @param file_data [in] The file in memory.
  * @param compressed_size [in] The file's size.
@@ -267,5 +292,16 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
  */
 [[nodiscard]] int DecompressLz4Data(const void* file_data, int compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
+
+/* Decompresses data in memory using LZ4. Only works for LZ4 frames (meaning there's metadata).
+ *
+ * @param file_data [in] The file in memory.
+ * @param compressed_size [in] The file's size.
+ * @param decompressed_file [out] The pointer for where the compressed data will be put.
+ * @param decompressed_size [in] The size of the decompressed data. This function was not made to read the metadata from an LZ4 frame.
+ *
+ * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
+ */
+[[nodiscard]] size_t DecompressLz4Data_Metadata(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
 
 } // namespace q4b

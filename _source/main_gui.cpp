@@ -266,6 +266,8 @@ int main(int argc, char** argv)
 					ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
 					ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
 					ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
+					static bool metadata_for_files = false;
+					ImGui::Checkbox("Metadata", &metadata_for_files);
 					ImGui::PopItemWidth();
 
 					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
@@ -285,6 +287,12 @@ int main(int argc, char** argv)
 									case q4b::CompressionScheme::lz4:
 										FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
 										break;
+								}
+
+								if (metadata_for_files) {
+									FILE_LIST[i].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
+								} else {
+									FILE_LIST[i].unsetFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
 								}
 							}
 						}

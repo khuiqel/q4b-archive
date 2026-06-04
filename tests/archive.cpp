@@ -181,7 +181,6 @@ TEST(WriteArchive, ZstdMetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
 
-#if 0
 TEST(WriteArchive, Lz4MetadataSmaller) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -201,13 +200,13 @@ TEST(WriteArchive, Lz4MetadataSmaller) {
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
 
-	// Verify the archive without metadata is smaller (TODO: specifically by 4 bytes?)
+	// Verify the archive without metadata is smaller
+	// (LZ4HC and LZ4F use different compression functions/parameters so the size will be wildly different)
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), std::filesystem::file_size(TEST_ARCHIVE_PATH_2));
 
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
-#endif
 
 TEST(ArchiveStructs, SetPath) {
 	q4b::ArchivedFileHeader file_header;
