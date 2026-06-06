@@ -21,6 +21,27 @@ int GuiData::zstd_level_default_idx = -1;
 int GuiData::lz4_level_default_idx = -1;
 int GuiData::brotli_level_default_idx;
 
+// TODO: This should probably be in q4b.hpp instead
+q4b::CompressionScheme GuiData::get_compression_type() const {
+	switch (compression_type_idx) {
+		default:  [[fallthrough]];
+		case 0:   return q4b::CompressionScheme::Uncompressed;
+		case 1:   return q4b::CompressionScheme::lz4;
+		case 2:   return q4b::CompressionScheme::zstd;
+		case 3:   return q4b::CompressionScheme::brotli;
+	}
+}
+
+int GuiData::get_compression_level() const {
+	switch (get_compression_type()) {
+		default: [[fallthrough]];
+		case q4b::CompressionScheme::Uncompressed: return 0;
+		case q4b::CompressionScheme::lz4:          return lz4_level_num[lz4_level_idx];
+		case q4b::CompressionScheme::zstd:         return zstd_level_num[zstd_level_idx];
+		case q4b::CompressionScheme::brotli:       return brotli_level_num[brotli_level_idx];
+	}
+}
+
 void GuiData::Initialize() {
 	if (!zstd_level_arr.empty() || !lz4_level_arr.empty()) {
 		return;

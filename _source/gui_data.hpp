@@ -17,6 +17,8 @@ struct GuiData {
 
 	int compression_type_idx = 2;
 	static std::vector<const char*> compression_types;
+	q4b::CompressionScheme get_compression_type() const;
+	int get_compression_level() const;
 
 	int zstd_level_idx;
 	static std::vector<char*> zstd_level_arr;

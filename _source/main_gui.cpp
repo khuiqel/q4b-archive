@@ -168,17 +168,7 @@ int main(int argc, char** argv)
 				case SDL_EVENT_DROP_FILE:
 					if (rootDirIsLocked) {
 						std::filesystem::path path(event.drop.data);
-						int level;
-						//TODO
-						if (gdata.compression_type_idx == 1)
-							level = GuiData::lz4_level_num[gdata.lz4_level_idx];
-						else if (gdata.compression_type_idx == 2)
-							level = GuiData::zstd_level_num[gdata.zstd_level_idx];
-						else if (gdata.compression_type_idx == 3)
-							level = GuiData::brotli_level_num[gdata.brotli_level_idx];
-						else
-							level = 0;
-						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)(gdata.compression_type_idx == 3 ? (int)q4b::CompressionScheme::brotli : gdata.compression_type_idx), level });
+						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), gdata.get_compression_type(), gdata.get_compression_level() });
 					}
 					break;
 			}
@@ -277,25 +267,8 @@ int main(int argc, char** argv)
 					if (ImGui::Button("Change Files")) {
 						for (int i = 0; i < ITEMS_COUNT; i++) {
 							if (selection.Contains((ImGuiID)i)) {
-								FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)(gdata.compression_type_idx==3 ? (int)q4b::CompressionScheme::brotli : gdata.compression_type_idx);
-								switch (FILE_LIST[i].data.compression_type) {
-									default: [[fallthrough]];
-									case q4b::CompressionScheme::Uncompressed:
-										FILE_LIST[i].compression_level = 0;
-										break;
-
-									case q4b::CompressionScheme::zstd:
-										FILE_LIST[i].compression_level = GuiData::zstd_level_num[gdata.zstd_level_idx];
-										break;
-									case q4b::CompressionScheme::lz4:
-										FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
-										break;
-
-									case q4b::CompressionScheme::brotli:
-										FILE_LIST[i].compression_level = GuiData::brotli_level_num[gdata.brotli_level_idx];
-										break;
-								}
-
+								FILE_LIST[i].data.compression_type = gdata.get_compression_type();
+								FILE_LIST[i].compression_level = gdata.get_compression_level();
 								if (metadata_for_files) {
 									FILE_LIST[i].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
 								} else {
