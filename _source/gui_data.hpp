@@ -28,6 +28,11 @@ struct GuiData {
 	static std::vector<int> lz4_level_num;
 	static int lz4_level_default_idx;
 
+	int brotli_level_idx;
+	static std::vector<char*> brotli_level_arr;
+	static std::vector<int> brotli_level_num;
+	static int brotli_level_default_idx;
+
 	static void Initialize();
 
 	GuiData();

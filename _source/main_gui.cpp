@@ -174,9 +174,11 @@ int main(int argc, char** argv)
 							level = GuiData::lz4_level_num[gdata.lz4_level_idx];
 						else if (gdata.compression_type_idx == 2)
 							level = GuiData::zstd_level_num[gdata.zstd_level_idx];
+						else if (gdata.compression_type_idx == 3)
+							level = GuiData::brotli_level_num[gdata.brotli_level_idx];
 						else
 							level = 0;
-						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)gdata.compression_type_idx, level });
+						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), (q4b::CompressionScheme)(gdata.compression_type_idx == 3 ? (int)q4b::CompressionScheme::brotli : gdata.compression_type_idx), level });
 					}
 					break;
 			}
@@ -266,6 +268,7 @@ int main(int argc, char** argv)
 					ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
 					ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
 					ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
+					ImGui::Combo("Brotli Compression Level", &gdata.brotli_level_idx, GuiData::brotli_level_arr.data(), GuiData::brotli_level_arr.size());
 					static bool metadata_for_files = false;
 					ImGui::Checkbox("Metadata", &metadata_for_files);
 					ImGui::PopItemWidth();
@@ -274,7 +277,7 @@ int main(int argc, char** argv)
 					if (ImGui::Button("Change Files")) {
 						for (int i = 0; i < ITEMS_COUNT; i++) {
 							if (selection.Contains((ImGuiID)i)) {
-								FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)gdata.compression_type_idx;
+								FILE_LIST[i].data.compression_type = (q4b::CompressionScheme)(gdata.compression_type_idx==3 ? (int)q4b::CompressionScheme::brotli : gdata.compression_type_idx);
 								switch (FILE_LIST[i].data.compression_type) {
 									default: [[fallthrough]];
 									case q4b::CompressionScheme::Uncompressed:
@@ -286,6 +289,10 @@ int main(int argc, char** argv)
 										break;
 									case q4b::CompressionScheme::lz4:
 										FILE_LIST[i].compression_level = GuiData::lz4_level_num[gdata.lz4_level_idx];
+										break;
+
+									case q4b::CompressionScheme::brotli:
+										FILE_LIST[i].compression_level = GuiData::brotli_level_num[gdata.brotli_level_idx];
 										break;
 								}
 

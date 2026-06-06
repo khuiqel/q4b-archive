@@ -36,12 +36,12 @@ enum class CompressionScheme : uint32_t {
 	zstd_dict,
 	CountNormal,
 
-	CountExtraStart = 100,
-	//lz4 has a dict mode, probably don't bother
+	CountExtraStart = 1000,
 	brotli,
 	lzma,
 	bzip2,
-	miniz, //zlib replacement
+	zlib, //implemented using miniz
+	lz4_dict,
 	//OpenZL, //https://github.com/facebook/openzl
 	CountExtraEnd,
 };
@@ -55,10 +55,11 @@ inline const char* CompressionToStr(CompressionScheme c) {
 		case CompressionScheme::zstd:         return "zstd";
 		case CompressionScheme::zstd_dict:    return "zstd_dict";
 
-		// case CompressionScheme::brotli:       return "brotli";
+		case CompressionScheme::brotli:       return "brotli";
 		// case CompressionScheme::lzma:         return "lzma";
 		// case CompressionScheme::bzip2:        return "bzip2";
-		// case CompressionScheme::miniz:        return "miniz";
+		// case CompressionScheme::zlib:         return "zlib";
+		// case CompressionScheme::lz4_dict:     return "lz4_dict";
 	}
 }
 
@@ -303,5 +304,27 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
  */
 [[nodiscard]] size_t DecompressLz4Data_Metadata(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
+
+/* Compresses data in memory using Brotli. Returns the size of the compressed data, as a Brotli block (meaning no metadata) (Brotli doesn't have a frame format).
+ *
+ * @param file_data [in] The file in memory.
+ * @param uncompressed_size [in] The file's size.
+ * @param compressed_file [out] The pointer for where the compressed data will be put.
+ * @param compression_level [in] Brotli compression level to use.
+ *
+ * @return Size of the compressed data. -1 if it failed (TODO). Allocated memory will be >= the compressed size.
+ */
+[[nodiscard]] size_t CompressBrotliData(const void* file_data, size_t uncompressed_size, char** compressed_file, int compression_level) noexcept;
+
+/* Decompresses data in memory using Brotli. Returns the decompressed size.
+ *
+ * @param file_data [in] The file in memory.
+ * @param compressed_size [in] The file's size.
+ * @param decompressed_file [out] The pointer for where the compressed data will be put.
+ * @param decompressed_size [in] The size of the decompressed data. Brotli does not have a frame format to grab the size from.
+ *
+ * @return Size of the decompressed data. -1 if it failed (TODO). Should be equal to decompressed_file_size.
+ */
+[[nodiscard]] size_t DecompressBrotliData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept;
 
 } // namespace q4b

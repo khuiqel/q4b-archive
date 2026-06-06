@@ -8,6 +8,8 @@
 #include <zstd.h>
 #include <lz4hc.h>
 #include <lz4frame.h>
+#include <brotli/encode.h>
+#include <brotli/decode.h>
 
 namespace q4b {
 
@@ -248,6 +250,18 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				delete[] file_data;
 				break;
 			}
+
+			case CompressionScheme::brotli: {
+				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					messages->push_back({ ErrorSeverity::warn, "Brotli doesn't support writing metadata" });
+					// The blocks have a header, but Brotli doesn't have a frame format
+				}
+				size_t compressed_size = CompressBrotliData(file_data, file_header.uncompressed_size, &(compressed_files_data[i]), file.compression_level);
+				file_header.compressed_size = compressed_size;
+				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
+				delete[] file_data;
+				break;
+			}
 		}
 
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
@@ -427,6 +441,20 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				outfile.close();
 				break;
 			}
+
+			case CompressionScheme::brotli: {
+				// Brotli doesn't have a frame format, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
+				char* decompressed_file;
+				size_t decompressed_size = DecompressBrotliData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
+				if (decompressed_size != file_header.uncompressed_size) {
+					std::cout << "file size mismatch!\n";
+					//TODO
+				}
+				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
+				outfile.write((const char*)decompressed_file, decompressed_size);
+				outfile.close();
+				break;
+			}
 		}
 
 		// std::cout << "uncompressed " << i << "\n";
@@ -564,6 +592,21 @@ size_t DecompressLz4Data_Metadata(const void* file_data, size_t compressed_size,
 
 	LZ4F_freeDecompressionContext(dctx);
 	return decompressed_size; // TODO
+}
+
+size_t CompressBrotliData(const void* file_data, size_t uncompressed_size, char** compressed_file, int compression_level) noexcept {
+	size_t compressedBufSize = BrotliEncoderMaxCompressedSize(uncompressed_size); //TODO: what to do when compression level not >=2?
+	*compressed_file = new char[compressedBufSize];
+	int ret = BrotliEncoderCompress(compression_level, BROTLI_DEFAULT_WINDOW, BROTLI_DEFAULT_MODE, uncompressed_size, (const uint8_t*) file_data, &compressedBufSize, (uint8_t*) *compressed_file);
+	// CLI default lgwin is 24, encode.h default is 22; why do these compression formats always make their CLI different?
+	return compressedBufSize; // Brotli takes the buffer size as an input and changes it to the compressed size
+}
+
+size_t DecompressBrotliData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
+	*decompressed_file = new char[decompressed_size];
+	size_t decompressedSize = decompressed_size;
+	BrotliDecoderResult ret = BrotliDecoderDecompress(compressed_size, (const uint8_t*) file_data, &decompressedSize, (uint8_t*) *decompressed_file);
+	return decompressedSize;
 }
 
 } // namespace q4b

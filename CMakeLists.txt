@@ -71,9 +71,18 @@ set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
 set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # TODO: Even if this is disabled, Zstd's CMake file still reports multithreading is enabled... should ZSTD_MULTITHREAD_SUPPORT be set instead?
 
+# LZ4 configuration
+# none
+
+# Brotli configuration
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BROTLI_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(BROTLI_BUILD_FOR_PACKAGE OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
 add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
+add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
 
 # These don't work because the packages don't provide the CMake files to find their libs/dirs, or something:
 #[[
@@ -91,6 +100,11 @@ if(USE_SYSTEM_LZ4)
 	find_package(lz4 1.8.0 REQUIRED)
 else()
 	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
+endif()
+if(USE_SYSTEM_BROTLI)
+	find_package(brotli 1.1.0 REQUIRED)
+else()
+	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
 endif()
 #]]
 
@@ -133,9 +147,10 @@ endif()
 
 target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
 include_directories(PRIVATE Externals/xxHash)
+include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
 
-target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static)
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static)
+target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3)
 
 
@@ -157,7 +172,7 @@ if (MSVC)
 	set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 endif()
 
-target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE libzstd_static lz4_static)
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
 
 include(GoogleTest)

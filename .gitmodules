@@ -19,3 +19,6 @@
 [submodule "Externals/lz4"]
 	path = Externals/lz4
 	url = https://github.com/lz4/lz4.git
+[submodule "Externals/brotli"]
+	path = Externals/brotli
+	url = https://github.com/google/brotli.git
