@@ -107,7 +107,7 @@ GNU General Public License v3.0
 * [SDL (Simple DirectMedia Layer)](https://www.libsdl.org/): zlib
 * [Dear ImGui](https://github.com/ocornut/imgui): MIT
 * [googletest](https://github.com/google/googletest): BSD-3-Clause
-* [cpp-optparse](https://github.com/weisslj/cpp-optparse): MIT
+* [CLI11](https://github.com/CLIUtils/CLI11): BSD-3-Clause
 * [xxHash](https://github.com/Cyan4973/xxHash): BSD-2-Clause
 * [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [LZ4](https://github.com/lz4/lz4): BSD-2-Clause and GPLv2+
