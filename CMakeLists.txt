@@ -145,6 +145,7 @@ if (MSVC)
 	# target_link_options(${PROJECT_GUI_NAME} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif()
 
+target_include_directories(${PROJECT_NAME}     PRIVATE Externals/CLI11/include)
 target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
 include_directories(PRIVATE Externals/xxHash)
 include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
