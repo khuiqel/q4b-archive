@@ -70,6 +70,10 @@ Windows:
 * CMake: `cmake --build build --config Release --target q4b-tests` & `"build/Release/q4b-tests.exe"`
 * Visual Studio: Build `q4b-tests` then run it
 
+## Benchmarking Utility (TODO)
+
+Test out the various compression schemes, comparing the compression time vs. size! Outputs a CSV, or can generate a plot if you have `matplotlib`.
+
 ## Stuff that works
 
 * drag and drop files to build list
