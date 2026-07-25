@@ -51,15 +51,15 @@ inline const char* CompressionToStr(CompressionScheme c) {
 		default: return "Unknown";
 
 		case CompressionScheme::Uncompressed: return "Uncompressed";
-		case CompressionScheme::lz4:          return "lz4";
-		case CompressionScheme::zstd:         return "zstd";
-		case CompressionScheme::zstd_dict:    return "zstd_dict";
+		case CompressionScheme::lz4:          return "LZ4";
+		case CompressionScheme::zstd:         return "Zstd";
+		case CompressionScheme::zstd_dict:    return "Zstd_dict";
 
-		case CompressionScheme::brotli:       return "brotli";
-		// case CompressionScheme::lzma:         return "lzma";
+		case CompressionScheme::brotli:       return "Brotli";
+		// case CompressionScheme::lzma:         return "LZMA";
 		// case CompressionScheme::bzip2:        return "bzip2";
 		// case CompressionScheme::zlib:         return "zlib";
-		// case CompressionScheme::lz4_dict:     return "lz4_dict";
+		// case CompressionScheme::lz4_dict:     return "LZ4_dict";
 	}
 }
 

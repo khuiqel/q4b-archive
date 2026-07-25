@@ -117,6 +117,7 @@ add_executable(${PROJECT_NAME}
 
 add_executable(${PROJECT_GUI_NAME}
 	_source/q4b.cpp
+	_source/compression_schemes.cpp
 	_source/gui_data.cpp
 	_source/main_gui.cpp
 

@@ -255,12 +255,25 @@ int main(int argc, char** argv)
 
 					ImGui::SeparatorText("Change");
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-					ImGui::Combo("Compression Scheme", &gdata.compression_type_idx, GuiData::compression_types.data(), GuiData::compression_types.size());
-					ImGui::Combo("Zstd Compression Level", &gdata.zstd_level_idx, GuiData::zstd_level_arr.data(), GuiData::zstd_level_arr.size());
-					ImGui::Combo("LZ4 Compression Level", &gdata.lz4_level_idx, GuiData::lz4_level_arr.data(), GuiData::lz4_level_arr.size());
-					ImGui::Combo("Brotli Compression Level", &gdata.brotli_level_idx, GuiData::brotli_level_arr.data(), GuiData::brotli_level_arr.size());
+
+					if (ImGui::BeginCombo("Compression Scheme", GuiData::compressionSchemes[gdata.compressionScheme_idx]->displayName)) {
+						for (int n = 0; n < GuiData::compressionSchemes.size(); n++) {
+							if (ImGui::Selectable(GuiData::compressionSchemes[n]->displayName, gdata.compressionScheme_idx == n)) {
+								gdata.set_compressionScheme(n);
+							}
+						}
+						ImGui::EndCombo();
+					}
+
+					ImGui::Indent();
+
+					ImGui::Combo("Compression Level", &gdata.compressionLevel_idx, GuiData::compressionSchemes[gdata.compressionScheme_idx]->clevel_str.data(), GuiData::compressionSchemes[gdata.compressionScheme_idx]->clevel_str.size());
+
+					ImGui::Unindent();
+
 					static bool metadata_for_files = false;
 					ImGui::Checkbox("Metadata", &metadata_for_files);
+
 					ImGui::PopItemWidth();
 
 					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }

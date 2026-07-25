@@ -2,6 +2,7 @@
 #include <vector>
 #include <imgui.h>
 #include "q4b.hpp"
+#include "compression_schemes.hpp"
 
 struct GuiData {
 	// Archive stuff
@@ -15,27 +16,24 @@ struct GuiData {
 
 	// Compressing files
 
-	int compression_type_idx = 2;
-	static std::vector<const char*> compression_types;
-	q4b::CompressionScheme get_compression_type() const;
-	int get_compression_level() const;
+	static std::vector<CompressionSchemeData*> compressionSchemes;
 
-	int zstd_level_idx;
-	static std::vector<char*> zstd_level_arr;
-	static std::vector<int> zstd_level_num;
-	static int zstd_level_default_idx;
+	int compressionScheme_idx;
+	int compressionLevel_idx;
+	void set_compressionScheme(int idx) {
+		compressionScheme_idx = idx;
+		compressionLevel_idx = compressionSchemes[compressionScheme_idx]->clevel_default_idx;
+	}
 
-	int lz4_level_idx;
-	static std::vector<char*> lz4_level_arr;
-	static std::vector<int> lz4_level_num;
-	static int lz4_level_default_idx;
-
-	int brotli_level_idx;
-	static std::vector<char*> brotli_level_arr;
-	static std::vector<int> brotli_level_num;
-	static int brotli_level_default_idx;
+	q4b::CompressionScheme get_compression_type() const {
+		return compressionSchemes[compressionScheme_idx]->scheme;
+	}
+	int get_compression_level() const {
+		return compressionSchemes[compressionScheme_idx]->clevel_num[compressionLevel_idx];
+	}
 
 	static void Initialize();
+	static void Uninitialize();
 
 	GuiData();
 };
