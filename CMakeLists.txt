@@ -110,6 +110,7 @@ endif()
 
 add_executable(${PROJECT_NAME}
 	_source/q4b.cpp
+	_source/compression_schemes.cpp
 	_source/main_cli.cpp
 
 	Externals/xxHash/xxhash.c
@@ -166,6 +167,7 @@ add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 	tests/archive.cpp
 
 	_source/q4b.cpp
+	_source/compression_schemes.cpp
 
 	Externals/xxHash/xxhash.c
 )

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstring> //memcpy
 #include <algorithm>
+#include "compression_schemes.hpp"
 
 #include <zstd.h>
 #include <lz4hc.h>
@@ -198,55 +199,21 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 			}
 
 			case CompressionScheme::zstd: {
-				//TODO: this should use a fixed Zstd context instead
-				ZSTD_CCtx* cctx = ZSTD_createCCtx();
-				ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, threadCount);
-				if (file.compression_level == INT_MAX) [[unlikely]] {
-					zstd_setMaxCompression(cctx);
-				} else {
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, file.compression_level);
-					// Other parameters are automatically set given the compression level (that would've been a huge headache otherwise)
-				}
-
-				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 1); // Default already 1
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
-					file_header.setFlag(Q4B_ArchivedFileFlags::MetadataEmbedded);
-				} else {
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
-					ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
-				}
-
-				size_t compressed_size = CompressZstdData(cctx, file_data, file_header.uncompressed_size, &(compressed_files_data[i]));
-				file_header.compressed_size = compressed_size;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
+				CompressionSchemeFunctions* zstd_functions = new CompressionSchemeFunctions_Zstd();
+				uint64_t compressedSize = zstd_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
+				file_header.compressed_size = compressedSize;
+				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
+				delete zstd_functions;
 				delete[] file_data;
-
-				ZSTD_freeCCtx(cctx);
 				break;
 			}
 
 			case CompressionScheme::lz4: {
-				size_t compressed_size;
-				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
-					LZ4F_preferences_t prefs = {}; // LZ4F_INIT_PREFERENCES will set to the defaults, but 0 is also interpreted as default
-					prefs.compressionLevel = file.compression_level;
-					// prefs.frameInfo.contentSize = file_header.uncompressed_size; // This writes 8 extra bytes
-
-					// No need to write checksums because the archive already does that
-					prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum; // Default already 0
-					prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum; // Default already 0
-
-					compressed_size = CompressLz4Data_Metadata(&prefs, file_data, file_header.uncompressed_size, &(compressed_files_data[i]));
-					file_header.setFlag(Q4B_ArchivedFileFlags::MetadataEmbedded);
-				} else {
-					compressed_size = CompressLz4Data(file_data, file_header.uncompressed_size, &(compressed_files_data[i]), file.compression_level);
-				}
-
-				file_header.compressed_size = compressed_size;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
+				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
+				uint64_t compressedSize = lz4_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
+				file_header.compressed_size = compressedSize;
+				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
+				delete lz4_functions;
 				delete[] file_data;
 				break;
 			}
@@ -256,9 +223,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 					messages->push_back({ ErrorSeverity::warn, "Brotli doesn't support writing metadata" });
 					// The blocks have a header, but Brotli doesn't have a frame format
 				}
-				size_t compressed_size = CompressBrotliData(file_data, file_header.uncompressed_size, &(compressed_files_data[i]), file.compression_level);
-				file_header.compressed_size = compressed_size;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressed_size);
+				CompressionSchemeFunctions* brotli_functions = new CompressionSchemeFunctions_Brotli();
+				uint64_t compressedSize = brotli_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
+				file_header.compressed_size = compressedSize;
+				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
+				delete brotli_functions;
 				delete[] file_data;
 				break;
 			}
@@ -412,46 +381,47 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 			case CompressionScheme::zstd: {
 				// Zstd doesn't care about the metadata, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
-				char* decompressed_file;
-				size_t decompressed_size = DecompressZstdData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
-				if (decompressed_size != file_header.uncompressed_size) {
+				void* outputData;
+				CompressionSchemeFunctions* zstd_functions = new CompressionSchemeFunctions_Zstd();
+				uint64_t decompressedSize = zstd_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
+				delete zstd_functions;
+				if (decompressedSize != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
 				}
 				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)decompressed_file, decompressed_size);
+				outfile.write((const char*)outputData, decompressedSize);
 				outfile.close();
 				break;
 			}
 
 			case CompressionScheme::lz4: {
-				char* decompressed_file;
-				size_t decompressed_size;
-				if (file_header.getFlag(Q4B_ArchivedFileFlags::MetadataEmbedded)) {
-					decompressed_size = DecompressLz4Data_Metadata(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
-				} else {
-					decompressed_size = DecompressLz4Data(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
-				}
-				if (decompressed_size != file_header.uncompressed_size) {
+				void* outputData;
+				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
+				uint64_t decompressedSize = lz4_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
+				delete lz4_functions;
+				if (decompressedSize != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
 				}
 				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)decompressed_file, decompressed_size);
+				outfile.write((const char*)outputData, decompressedSize);
 				outfile.close();
 				break;
 			}
 
 			case CompressionScheme::brotli: {
 				// Brotli doesn't have a frame format, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
-				char* decompressed_file;
-				size_t decompressed_size = DecompressBrotliData(compressed_files_data[i], file_header.compressed_size, &decompressed_file, file_header.uncompressed_size);
-				if (decompressed_size != file_header.uncompressed_size) {
+				void* outputData;
+				CompressionSchemeFunctions* brotli_functions = new CompressionSchemeFunctions_Brotli();
+				uint64_t decompressedSize = brotli_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
+				delete brotli_functions;
+				if (decompressedSize != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
 				}
 				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)decompressed_file, decompressed_size);
+				outfile.write((const char*)outputData, decompressedSize);
 				outfile.close();
 				break;
 			}
@@ -539,74 +509,6 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) n
 	return bytesRead;
 
 	// No need to call file.close() because fstream destructors close automatically
-}
-
-size_t CompressZstdData(void* cctx, const void* file_data, size_t uncompressed_size, char** compressed_file) noexcept {
-	size_t compressedBufSize = ZSTD_compressBound(uncompressed_size);
-	*compressed_file = new char[compressedBufSize];
-	size_t compressedSize = ZSTD_compress2((ZSTD_CCtx*)cctx, *compressed_file, compressedBufSize, file_data, uncompressed_size);
-	return compressedSize;
-}
-
-int CompressLz4Data(const void* file_data, int uncompressedSize, char** compressed_file, int compression_level) noexcept {
-	int compressedBufSize = LZ4_compressBound(uncompressedSize);
-	*compressed_file = new char[compressedBufSize];
-	int compressedSize = LZ4_compress_HC((const char*)file_data, *compressed_file, uncompressedSize, compressedBufSize, compression_level);
-	return compressedSize;
-}
-
-size_t CompressLz4Data_Metadata(const void* prefs, const void* file_data, size_t uncompressedSize, char** compressed_file) noexcept {
-	size_t compressedBufSize = LZ4F_compressFrameBound(uncompressedSize, (const LZ4F_preferences_t*)prefs);
-	*compressed_file = new char[compressedBufSize];
-	size_t compressedSize = LZ4F_compressFrame(*compressed_file, compressedBufSize, file_data, uncompressedSize, (const LZ4F_preferences_t*)prefs);
-	// HC compression function follows LZ4's old parameter order, but frame compression follows Zstd's...
-	return compressedSize;
-}
-
-size_t DecompressZstdData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
-	*decompressed_file = new char[decompressed_size];
-	size_t decompressedSize = ZSTD_decompress(*decompressed_file, decompressed_size, file_data, compressed_size);
-	return decompressedSize;
-}
-
-int DecompressLz4Data(const void* file_data, int compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
-	*decompressed_file = new char[decompressed_size];
-	int decompressedSize = LZ4_decompress_safe((const char*)file_data, *decompressed_file, compressed_size, decompressed_size);
-	return decompressedSize;
-}
-
-size_t DecompressLz4Data_Metadata(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
-	LZ4F_dctx* dctx;
-	LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
-	const LZ4F_decompressOptions_t dOpt = { 0, 1, 0, 0 };
-	*decompressed_file = new char[decompressed_size];
-
-	size_t srcPos = 0;
-	size_t ret;
-	do {
-		size_t dstSize = decompressed_size;
-		size_t srcSize = compressed_size - srcPos;
-		ret = LZ4F_decompress(dctx, *decompressed_file, &dstSize, (char*)file_data + srcPos, &srcSize, &dOpt);
-		srcPos += srcSize;
-	} while (srcPos < compressed_size && ret != 0);
-
-	LZ4F_freeDecompressionContext(dctx);
-	return decompressed_size; // TODO
-}
-
-size_t CompressBrotliData(const void* file_data, size_t uncompressed_size, char** compressed_file, int compression_level) noexcept {
-	size_t compressedBufSize = BrotliEncoderMaxCompressedSize(uncompressed_size); //TODO: what to do when compression level not >=2?
-	*compressed_file = new char[compressedBufSize];
-	int ret = BrotliEncoderCompress(compression_level, BROTLI_DEFAULT_WINDOW, BROTLI_DEFAULT_MODE, uncompressed_size, (const uint8_t*) file_data, &compressedBufSize, (uint8_t*) *compressed_file);
-	// CLI default lgwin is 24, encode.h default is 22; why do these compression formats always make their CLI different?
-	return compressedBufSize; // Brotli takes the buffer size as an input and changes it to the compressed size
-}
-
-size_t DecompressBrotliData(const void* file_data, size_t compressed_size, char** decompressed_file, size_t decompressed_size) noexcept {
-	*decompressed_file = new char[decompressed_size];
-	size_t decompressedSize = decompressed_size;
-	BrotliDecoderResult ret = BrotliDecoderDecompress(compressed_size, (const uint8_t*) file_data, &decompressedSize, (uint8_t*) *decompressed_file);
-	return decompressedSize;
 }
 
 } // namespace q4b
