@@ -44,6 +44,7 @@ TEST(WriteArchive, OneFileUncompressed) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
+#ifdef Q4B_ENABLE_ZSTD
 TEST(WriteArchive, OneFileCompressedZstd) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -59,6 +60,7 @@ TEST(WriteArchive, OneFileCompressedZstd) {
 
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
+#endif
 
 TEST(WriteArchive, TwoFilesUncompressed) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
@@ -75,6 +77,7 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
+#if defined(Q4B_ENABLE_ZSTD) && defined(Q4B_ENABLE_LZ4)
 TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -101,6 +104,7 @@ TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
+#endif
 
 TEST(WriteArchive, OneFileNonexistant) {
 	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTANT));
@@ -128,7 +132,7 @@ TEST(WriteArchive, SomeFilesExist) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
@@ -155,6 +159,7 @@ TEST(WriteArchive, ThreeFilesDuplicateFail) {
 	EXPECT_TRUE(messages[1].severity == q4b::ErrorSeverity::error);
 }
 
+#ifdef Q4B_ENABLE_ZSTD
 TEST(WriteArchive, ZstdMetadataSmaller) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -180,7 +185,9 @@ TEST(WriteArchive, ZstdMetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
+#endif
 
+#ifdef Q4B_ENABLE_LZ4
 TEST(WriteArchive, Lz4MetadataSmaller) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -207,6 +214,7 @@ TEST(WriteArchive, Lz4MetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
+#endif
 
 TEST(ArchiveStructs, SetPath) {
 	q4b::ArchivedFileHeader file_header;

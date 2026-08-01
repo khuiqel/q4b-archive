@@ -4,9 +4,11 @@ set(PROJECT_GUI_NAME ${PROJECT_NAME}-gui)
 set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
 
 # Note: when changing these defaults, you have to delete CMakeCache.txt
-option(USE_SYSTEM_SDL "Use the system SDL3 package" OFF)
-option(USE_SYSTEM_ZSTD "Use the system Zstd package" OFF)
-option(USE_SYSTEM_LZ4 "Use the system LZ4 package" OFF)
+option(Q4B_ENABLE_LZ4    "Enable LZ4 compression and decompression" ON)
+option(Q4B_ENABLE_ZSTD   "Enable Zstd compression and decompression" ON)
+option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
+set(Q4B_SCHEME_LIBS)
+option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF)
 
 set(CMAKE_CXX_STANDARD 23) # C++23 requires CMake 3.20
 set(CMAKE_CXX_STANDARD_REQUIRED False)
@@ -27,6 +29,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 else()
 	message(WARNING "Unknown compiler, assuming it's fine...")
 endif()
+
+# Global CMake configuration
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 # Enable SSE4.2
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -63,49 +68,45 @@ set(SDL_DISABLE_INSTALL_DOCS ON CACHE BOOL "" FORCE)
 set(SDL_INSTALL_TESTS OFF CACHE BOOL "" FORCE)
 set(SDL_UNIX_CONSOLE_BUILD OFF CACHE BOOL "" FORCE)
 
-# Zstd configuration
-set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
-set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(ZSTD_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
-set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # TODO: Even if this is disabled, Zstd's CMake file still reports multithreading is enabled... should ZSTD_MULTITHREAD_SUPPORT be set instead?
-
-# LZ4 configuration
-# none
-
-# Brotli configuration
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(BROTLI_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(BROTLI_BUILD_FOR_PACKAGE OFF CACHE BOOL "" FORCE)
-
 add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
-add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
-add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
-add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
+
+if(Q4B_ENABLE_LZ4)
+	# nothing to configure
+
+	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
+	list(APPEND Q4B_SCHEME_LIBS lz4_static)
+	add_compile_definitions(Q4B_ENABLE_LZ4)
+endif()
+
+if(Q4B_ENABLE_ZSTD)
+	set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+	set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(ZSTD_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+	set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+	set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
+	set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # TODO: Even if this is disabled, Zstd's CMake file still reports multithreading is enabled... should ZSTD_MULTITHREAD_SUPPORT be set instead?
+
+	add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
+	list(APPEND Q4B_SCHEME_LIBS libzstd_static)
+	add_compile_definitions(Q4B_ENABLE_ZSTD)
+endif()
+
+if(Q4B_ENABLE_BROTLI)
+	set(BROTLI_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+	set(BROTLI_BUILD_FOR_PACKAGE OFF CACHE BOOL "" FORCE)
+	include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
+
+	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
+	list(APPEND Q4B_SCHEME_LIBS ${BROTLI_LIBRARIES})
+	add_compile_definitions(Q4B_ENABLE_BROTLI)
+endif()
 
 # These don't work because the packages don't provide the CMake files to find their libs/dirs, or something:
 #[[
-if(USE_SYSTEM_SDL)
-	find_package(SDL3 3.4.0 REQUIRED COMPONENTS video render OPTIONAL_COMPONENTS gpu joystick)
-else()
-	add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
-endif()
-if(USE_SYSTEM_ZSTD)
-	find_package(zstd 1.5.0 REQUIRED)
-else()
-	add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
-endif()
-if(USE_SYSTEM_LZ4)
-	find_package(lz4 1.8.0 REQUIRED)
-else()
-	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
-endif()
-if(USE_SYSTEM_BROTLI)
-	find_package(brotli 1.1.0 REQUIRED)
-else()
-	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
-endif()
+find_package(SDL3 3.4.0 REQUIRED COMPONENTS video render OPTIONAL_COMPONENTS gpu joystick)
+find_package(lz4 1.8.0 REQUIRED)
+find_package(zstd 1.5.0 REQUIRED)
+find_package(brotli 1.1.0 REQUIRED)
 #]]
 
 add_executable(${PROJECT_NAME}
@@ -150,10 +151,9 @@ endif()
 target_include_directories(${PROJECT_NAME}     PRIVATE Externals/CLI11/include)
 target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
 include_directories(PRIVATE Externals/xxHash)
-include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
 
-target_link_libraries(${PROJECT_NAME}     PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}     PRIVATE ${Q4B_SCHEME_LIBS})
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3)
 
 
@@ -176,7 +176,7 @@ if (MSVC)
 	set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 endif()
 
-target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE libzstd_static lz4_static ${BROTLI_LIBRARIES})
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
 
 include(GoogleTest)

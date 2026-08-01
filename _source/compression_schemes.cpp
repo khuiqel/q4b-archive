@@ -1,12 +1,6 @@
 #include "compression_schemes.hpp"
 #include <iostream>
 
-#include <lz4frame.h>
-#define ZSTD_STATIC_LINKING_ONLY
-#include <zstd.h>
-#include <brotli/encode.h>
-#include <brotli/decode.h>
-
 void CompressionSchemeData_Uncompressed::Initialize() noexcept {
 	char* str = new char[2];
 	str[0] = '0'; str[1] = '\0';
@@ -15,6 +9,8 @@ void CompressionSchemeData_Uncompressed::Initialize() noexcept {
 	clevel_default_idx = 0;
 }
 
+#ifdef Q4B_ENABLE_LZ4
+#include <lz4frame.h>
 void CompressionSchemeData_Lz4::Initialize() noexcept {
 	clevel_str.reserve(LZ4F_compressionLevel_max());
 	clevel_num.reserve(LZ4F_compressionLevel_max());
@@ -35,7 +31,10 @@ void CompressionSchemeData_Lz4::Initialize() noexcept {
 		clevel_num.push_back(i);
 	}
 }
+#endif
 
+#ifdef Q4B_ENABLE_ZSTD
+#include <zstd.h>
 void CompressionSchemeData_Zstd::Initialize() noexcept {
 	clevel_str.reserve(ZSTD_maxCLevel()+1);
 	clevel_num.reserve(ZSTD_maxCLevel()+1);
@@ -70,7 +69,10 @@ void CompressionSchemeData_Zstd_Dict::Initialize() noexcept {
 	//TODO
 }
 */
+#endif
 
+#ifdef Q4B_ENABLE_BROTLI
+#include <brotli/encode.h>
 void CompressionSchemeData_Brotli::Initialize() noexcept {
 	clevel_str.reserve((BROTLI_MAX_QUALITY - BROTLI_MIN_QUALITY) + 1);
 	clevel_num.reserve((BROTLI_MAX_QUALITY - BROTLI_MIN_QUALITY) + 1);
@@ -92,6 +94,7 @@ void CompressionSchemeData_Brotli::Initialize() noexcept {
 		clevel_num.push_back(i);
 	}
 }
+#endif
 
 /*
 void CompressionSchemeData_Zlib::Initialize() noexcept {
@@ -101,7 +104,10 @@ void CompressionSchemeData_Zlib::Initialize() noexcept {
 
 
 
+#ifdef Q4B_ENABLE_LZ4
 #include <lz4hc.h>
+#include <lz4frame.h>
+
 uint64_t CompressionSchemeFunctions_Lz4::GetMaxSize() const {
 	//TODO
 	return LZ4_MAX_INPUT_SIZE;
@@ -200,6 +206,11 @@ uint64_t CompressionSchemeFunctions_Lz4::Decompress_UnknownSize(const void* inpu
 CompressionSchemeFunctions_Lz4::~CompressionSchemeFunctions_Lz4() {
 	//TODO: free cctx
 }
+#endif
+
+#ifdef Q4B_ENABLE_ZSTD
+#define ZSTD_STATIC_LINKING_ONLY
+#include <zstd.h>
 
 uint64_t CompressionSchemeFunctions_Zstd::GetMaxSize() const {
 	return INT64_MAX;
@@ -282,6 +293,11 @@ uint64_t CompressionSchemeFunctions_Zstd::Decompress_UnknownSize(const void* inp
 CompressionSchemeFunctions_Zstd::~CompressionSchemeFunctions_Zstd() {
 	//TODO: free cctx
 }
+#endif
+
+#ifdef Q4B_ENABLE_BROTLI
+#include <brotli/encode.h>
+#include <brotli/decode.h>
 
 uint64_t CompressionSchemeFunctions_Brotli::GetMaxSize() const {
 	return INT64_MAX;
@@ -315,3 +331,4 @@ uint64_t CompressionSchemeFunctions_Brotli::Decompress_UnknownSize(const void* i
 CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
 	//TODO?
 }
+#endif

@@ -6,12 +6,6 @@
 #include <algorithm>
 #include "compression_schemes.hpp"
 
-#include <zstd.h>
-#include <lz4hc.h>
-#include <lz4frame.h>
-#include <brotli/encode.h>
-#include <brotli/decode.h>
-
 namespace q4b {
 
 ArchiveHeader::ArchiveHeader() {
@@ -72,29 +66,6 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 	);
 	file_list.erase(it, file_list.end());
 }
-//probably put this on a different thread
-
-// Adapted from setMaxCompression(ZSTD_compressionParameters*) in programs/zstdcli.c
-static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_windowLog,        ZSTD_cParam_getBounds(ZSTD_c_windowLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_chainLog,         ZSTD_cParam_getBounds(ZSTD_c_chainLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_hashLog,          ZSTD_cParam_getBounds(ZSTD_c_hashLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_searchLog,        ZSTD_cParam_getBounds(ZSTD_c_searchLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_minMatch,         ZSTD_cParam_getBounds(ZSTD_c_minMatch).lowerBound); // lowerBound
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_targetLength,     ZSTD_cParam_getBounds(ZSTD_c_targetLength).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_strategy,         ZSTD_cParam_getBounds(ZSTD_c_strategy).upperBound);
-
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_overlapLog,       ZSTD_cParam_getBounds(ZSTD_c_overlapLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashLog,       ZSTD_cParam_getBounds(ZSTD_c_ldmHashLog).upperBound);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmHashRateLog,   0);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmMinMatch,      16);
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_ldmBucketSizeLog, ZSTD_cParam_getBounds(ZSTD_c_ldmBucketSizeLog).upperBound);
-
-	// Setting ZSTD_c_enableLongDistanceMatching is *sometimes* necessary, despite claiming to be auto-set by windowLog and strategy
-	ZSTD_CCtx_setParameter(cctx, ZSTD_c_enableLongDistanceMatching, 1);
-	// Does not appear necessary to set the compression level
-	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, ZSTD_maxCLevel());
-}
 
 
 
@@ -113,8 +84,20 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		return;
 	}
 
-	// Check for existence and duplicates
+	// Check for valid compression schemes, existence, duplicates
 	{
+		bool allSchemesValid = true;
+		for (int i = 0; i < file_list.size(); i++) {
+			if (SchemeIsEnabled(file_list[i].data.compression_type)) {
+				messages->push_back({ ErrorSeverity::error, "Unavailable scheme " + std::string(CompressionToStr(file_list[i].data.compression_type)) });
+				allSchemesValid = false;
+			}
+		}
+		if (!allSchemesValid) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+
 		bool allFilesExist = true;
 		for (int i = 0; i < file_list.size(); i++) {
 			if (!file_list[i].data.pathIsValid()) {
@@ -188,6 +171,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 
 		switch (file.data.compression_type) {
 			default:
+				//TODO: fail instead
 				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
 				file_header.compression_type = CompressionScheme::Uncompressed;
 				[[fallthrough]];
@@ -198,6 +182,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				break;
 			}
 
+			#ifdef Q4B_ENABLE_ZSTD
 			case CompressionScheme::zstd: {
 				CompressionSchemeFunctions* zstd_functions = new CompressionSchemeFunctions_Zstd();
 				uint64_t compressedSize = zstd_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
@@ -207,7 +192,9 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				delete[] file_data;
 				break;
 			}
+			#endif
 
+			#ifdef Q4B_ENABLE_LZ4
 			case CompressionScheme::lz4: {
 				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
 				uint64_t compressedSize = lz4_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
@@ -217,7 +204,9 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				delete[] file_data;
 				break;
 			}
+			#endif
 
+			#ifdef Q4B_ENABLE_BROTLI
 			case CompressionScheme::brotli: {
 				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
 					messages->push_back({ ErrorSeverity::warn, "Brotli doesn't support writing metadata" });
@@ -231,6 +220,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				delete[] file_data;
 				break;
 			}
+			#endif
 		}
 
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
@@ -369,7 +359,8 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 		switch (file_header.compression_type) {
 			default:
-				std::cerr << "ERROR: Unknown compression: " << (int64_t)file_header.compression_type << std::endl;
+				//TODO: fail instead
+				std::cerr << "ERROR: Unknown compression: " << q4b::CompressionToStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
 				[[fallthrough]];
 			case CompressionScheme::Uncompressed: {
 				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
@@ -379,6 +370,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				break;
 			}
 
+			#ifdef Q4B_ENABLE_ZSTD
 			case CompressionScheme::zstd: {
 				// Zstd doesn't care about the metadata, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
 				void* outputData;
@@ -394,7 +386,9 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				outfile.close();
 				break;
 			}
+			#endif
 
+			#ifdef Q4B_ENABLE_LZ4
 			case CompressionScheme::lz4: {
 				void* outputData;
 				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
@@ -409,7 +403,9 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				outfile.close();
 				break;
 			}
+			#endif
 
+			#ifdef Q4B_ENABLE_BROTLI
 			case CompressionScheme::brotli: {
 				// Brotli doesn't have a frame format, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
 				void* outputData;
@@ -425,6 +421,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				outfile.close();
 				break;
 			}
+			#endif
 		}
 
 		// std::cout << "uncompressed " << i << "\n";

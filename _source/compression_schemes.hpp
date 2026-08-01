@@ -54,6 +54,7 @@ struct CompressionSchemeData_Uncompressed final : public CompressionSchemeData {
 	void Initialize() noexcept override;
 };
 
+#ifdef Q4B_ENABLE_LZ4
 struct CompressionSchemeData_Lz4 final : public CompressionSchemeData {
 	CompressionSchemeData_Lz4() {
 		scheme = q4b::CompressionScheme::lz4;
@@ -70,7 +71,9 @@ struct CompressionSchemeData_Lz4 final : public CompressionSchemeData {
 	}
 	void Initialize() noexcept override;
 };
+#endif
 
+#ifdef Q4B_ENABLE_ZSTD
 struct CompressionSchemeData_Zstd final : public CompressionSchemeData {
 	CompressionSchemeData_Zstd() {
 		scheme = q4b::CompressionScheme::zstd;
@@ -106,7 +109,9 @@ struct CompressionSchemeData_Zstd_Dict final : public CompressionSchemeData {
 	void Initialize() noexcept override;
 };
 */
+#endif
 
+#ifdef Q4B_ENABLE_BROTLI
 struct CompressionSchemeData_Brotli final : public CompressionSchemeData {
 	CompressionSchemeData_Brotli() {
 		scheme = q4b::CompressionScheme::brotli;
@@ -122,6 +127,7 @@ struct CompressionSchemeData_Brotli final : public CompressionSchemeData {
 	}
 	void Initialize() noexcept override;
 };
+#endif
 
 /*
 struct CompressionSchemeData_Zlib final : public CompressionSchemeData {
@@ -153,6 +159,7 @@ struct CompressionSchemeFunctions {
 	virtual ~CompressionSchemeFunctions() = default;
 };
 
+#ifdef Q4B_ENABLE_LZ4
 struct CompressionSchemeFunctions_Lz4 final : public CompressionSchemeFunctions {
 	uint64_t Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept override;
 	uint64_t Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept override;
@@ -161,7 +168,9 @@ struct CompressionSchemeFunctions_Lz4 final : public CompressionSchemeFunctions 
 	uint64_t GetMaxSize() const override;
 	~CompressionSchemeFunctions_Lz4();
 };
+#endif
 
+#ifdef Q4B_ENABLE_ZSTD
 struct CompressionSchemeFunctions_Zstd final : public CompressionSchemeFunctions {
 	//TODO: store cctx
 	uint64_t Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept override;
@@ -171,7 +180,9 @@ struct CompressionSchemeFunctions_Zstd final : public CompressionSchemeFunctions
 	uint64_t GetMaxSize() const override;
 	~CompressionSchemeFunctions_Zstd();
 };
+#endif
 
+#ifdef Q4B_ENABLE_BROTLI
 struct CompressionSchemeFunctions_Brotli final : public CompressionSchemeFunctions {
 	uint64_t Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept override;
 	uint64_t Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept override;
@@ -180,3 +191,4 @@ struct CompressionSchemeFunctions_Brotli final : public CompressionSchemeFunctio
 	uint64_t GetMaxSize() const override;
 	~CompressionSchemeFunctions_Brotli();
 };
+#endif

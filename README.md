@@ -20,8 +20,9 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 	* Linux: install [SDL dependencies](https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md)
 	* Only uses SDL's Video and Render subsystems; Joystick can be enabled if you want to use a gamepad to navigate the GUI. GPU is not needed.
 	* The `CMakeLists.txt` file sets the instruction set to SSE4.2 by default. If your CPU doesn't have that, change it.
-	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier.
-0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>`)
+	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier. The tests do require C++23 (or honestly C++20).
+0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
+	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options.
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
 
@@ -110,11 +111,11 @@ GNU General Public License v3.0
 
 * [SDL (Simple DirectMedia Layer)](https://www.libsdl.org/): zlib
 * [Dear ImGui](https://github.com/ocornut/imgui): MIT
-* [googletest](https://github.com/google/googletest): BSD-3-Clause
+* [GoogleTest](https://github.com/google/googletest): BSD-3-Clause
 * [CLI11](https://github.com/CLIUtils/CLI11): BSD-3-Clause
 * [xxHash](https://github.com/Cyan4973/xxHash): BSD-2-Clause
-* [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [LZ4](https://github.com/lz4/lz4): BSD-2-Clause and GPLv2+
+* [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [Brotli](https://github.com/google/brotli): MIT
 * [Noto Sans](https://notofonts.github.io/): [SIL OFL 1.1](https://openfontlicense.org/open-font-license-official-text/)
 

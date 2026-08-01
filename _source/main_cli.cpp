@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include "q4b.hpp"
+#include "compression_schemes.hpp"
 
 static void WriteFile(const std::filesystem::path& output, const char* data, size_t size) {
 	std::ofstream o(output, std::ios::binary);
@@ -38,7 +39,19 @@ static void ReadArchiveInputFile(const std::filesystem::path& input, std::vector
 
 int main(int argc, char** argv) {
 
-	CLI::App app("");
+	const std::string DESCRIPTION_STR = "Enabled schemes: Uncompressed"
+	#ifdef Q4B_ENABLE_LZ4
+	", LZ4"
+	#endif
+	#ifdef Q4B_ENABLE_ZSTD
+	", Zstd"
+	#endif
+	#ifdef Q4B_ENABLE_BROTLI
+	", Brotli"
+	#endif
+	;
+
+	CLI::App app(DESCRIPTION_STR);
 	// app.set_help_flag();
 	// app.set_help_all_flag("-h,--help", "Print this help message and exit");
 	CLI::App* subcom_archive    = app.add_subcommand("archive",    "Create Q4B Archives");
@@ -137,10 +150,11 @@ int main(int argc, char** argv) {
 		}
 
 		//TODO
-		char* compressed_file_data;
-		size_t compressed_size = q4b::CompressLz4Data(file_data, std::filesystem::file_size(INPUT), &compressed_file_data, std::stoi(LEVEL));
+		void* compressed_file_data;
+		CompressionSchemeFunctions* functions = new CompressionSchemeFunctions_Lz4();
+		uint64_t compressedSize = functions->Compress_GenericExport(std::stoi(LEVEL), WRITE_METADATA ? q4b::Q4B_CompressionFileFlags::DoWriteMetadata : q4b::Q4B_CompressionFileFlags::None, file_data, file_size, &compressed_file_data);
 
-		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()) / SchemeToExtension(q4b::CompressionScheme::lz4, WRITE_METADATA), compressed_file_data, compressed_size);
+		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()) / SchemeToExtension(q4b::CompressionScheme::lz4, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
 		delete[] file_data;
 
 	} else if (subcom == subcom_decompress) {

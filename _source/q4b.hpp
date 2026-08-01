@@ -63,6 +63,31 @@ inline const char* CompressionToStr(CompressionScheme c) {
 	}
 }
 
+inline bool SchemeIsEnabled(CompressionScheme c) {
+	switch (c) {
+		default: return false;
+
+		case CompressionScheme::Uncompressed: return true;
+		#ifdef Q4B_ENABLE_LZ4
+		case CompressionScheme::lz4:          return true;
+		#endif
+		#ifdef Q4B_ENABLE_ZSTD
+		case CompressionScheme::zstd:         return true;
+		case CompressionScheme::zstd_dict:    return true;
+		#endif
+
+		#ifdef Q4B_ENABLE_BROTLI
+		case CompressionScheme::brotli:       return true;
+		#endif
+		// case CompressionScheme::lzma:         return true;
+		// case CompressionScheme::bzip2:        return true;
+		// case CompressionScheme::zlib:         return true;
+		#ifdef Q4B_ENABLE_LZ4
+		// case CompressionScheme::lz4_dict:     return true;
+		#endif
+	}
+}
+
 inline XXH64_hash_t ComputeHash(void* data, size_t size) {
 	return XXH64(data, size, 0);
 	//XXH3 can do 64- or 128-bit hashes, and 128-bit is unnecessary

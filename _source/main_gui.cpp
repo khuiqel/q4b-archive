@@ -453,8 +453,8 @@ int main(int argc, char** argv)
 				*/
 
 				if (ImGui::BeginTabItem("About")) {
-					ImGui::Text("License: GNU General Public License v3.0");
-					ImGui::Text("SPDX-License-Identifier: GPL-3.0-only");
+					ImGui::TextUnformatted("License: GNU General Public License v3.0");
+					ImGui::TextUnformatted("SPDX-License-Identifier: GPL-3.0-only");
 					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 					ImGui::TextLinkOpenURL("GitHub link", "https://github.com/khuiqel/q4b-archive");
 
@@ -462,8 +462,19 @@ int main(int argc, char** argv)
 					ImGui::Checkbox("Demo Window", &show_demo_window);
 					// #endif
 
-					// ImGui::NewLine();
-					//TODO: enabled modules (zstd, lz4, others)
+					ImGui::NewLine();
+					if (ImGui::TreeNodeEx("Enabled Schemes", ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DefaultOpen)) {
+						#ifdef Q4B_ENABLE_LZ4
+						ImGui::TextUnformatted("LZ4");
+						#endif
+						#ifdef Q4B_ENABLE_ZSTD
+						ImGui::TextUnformatted("Zstd");
+						#endif
+						#ifdef Q4B_ENABLE_BROTLI
+						ImGui::TextUnformatted("Brotli");
+						#endif
+						ImGui::TreePop();
+					}
 
 					ImGui::NewLine();
 					if (ImGui::TreeNodeEx("Extra Buttons", ImGuiTreeNodeFlags_FramePadding)) {
