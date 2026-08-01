@@ -1,22 +1,18 @@
 /* NOTICE:
- * The archive portions of this header were heavily inspired by the P3A format:
+ * The Q4B archive format was heavily inspired by the P3A format:
  * https://github.com/ph3at/p3a-format/blob/main/p3a.h
  * License: MIT
  *
  * There are only so many ways to make a good file format, so it looks very similar because it
  * is very similar.
  * The CompressionScheme enum was explicitly matched though, to make hypothetical future
- * compatibility easier.
+ * compatibility easier (except as a u32 instead of u64).
  */
 
 #pragma once
-#include <filesystem>
-#include <vector>
-#include <unordered_map>
 #include <cstdint>
-#include <type_traits>
-#include <atomic>
-
+#include <filesystem>
+#include <type_traits> // std::is_trivially_copyable
 #include <xxhash.h>
 
 namespace q4b {
@@ -36,7 +32,7 @@ enum class CompressionScheme : uint32_t {
 	zstd_dict,
 	CountNormal,
 
-	CountExtraStart = 1000,
+	CountExtraStart = 1000, // Schemes after this are not used by P3A
 	brotli,
 	lzma,
 	bzip2,
@@ -46,6 +42,27 @@ enum class CompressionScheme : uint32_t {
 	CountExtraEnd,
 };
 
+constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
+	CompressionScheme::Uncompressed,
+	#ifdef Q4B_ENABLE_LZ4
+	CompressionScheme::lz4,
+	#endif
+	#ifdef Q4B_ENABLE_ZSTD
+	CompressionScheme::zstd,
+	#endif
+	#ifdef Q4B_ENABLE_BROTLI
+	CompressionScheme::brotli,
+	#endif
+};
+
+inline bool SchemeIsEnabled(CompressionScheme c) {
+	// If you want an O(1) lookup instead of O(n), use a switch statement
+	for (CompressionScheme s : LIST_OF_ENABLED_SCHEMES) {
+		if (s == c) return true;
+	}
+	return false;
+}
+
 inline const char* CompressionToStr(CompressionScheme c) {
 	switch (c) {
 		default: return "Unknown";
@@ -53,7 +70,7 @@ inline const char* CompressionToStr(CompressionScheme c) {
 		case CompressionScheme::Uncompressed: return "Uncompressed";
 		case CompressionScheme::lz4:          return "LZ4";
 		case CompressionScheme::zstd:         return "Zstd";
-		case CompressionScheme::zstd_dict:    return "Zstd_dict";
+		// case CompressionScheme::zstd_dict:    return "Zstd_dict";
 
 		case CompressionScheme::brotli:       return "Brotli";
 		// case CompressionScheme::lzma:         return "LZMA";
@@ -63,35 +80,12 @@ inline const char* CompressionToStr(CompressionScheme c) {
 	}
 }
 
-inline bool SchemeIsEnabled(CompressionScheme c) {
-	switch (c) {
-		default: return false;
-
-		case CompressionScheme::Uncompressed: return true;
-		#ifdef Q4B_ENABLE_LZ4
-		case CompressionScheme::lz4:          return true;
-		#endif
-		#ifdef Q4B_ENABLE_ZSTD
-		case CompressionScheme::zstd:         return true;
-		case CompressionScheme::zstd_dict:    return true;
-		#endif
-
-		#ifdef Q4B_ENABLE_BROTLI
-		case CompressionScheme::brotli:       return true;
-		#endif
-		// case CompressionScheme::lzma:         return true;
-		// case CompressionScheme::bzip2:        return true;
-		// case CompressionScheme::zlib:         return true;
-		#ifdef Q4B_ENABLE_LZ4
-		// case CompressionScheme::lz4_dict:     return true;
-		#endif
-	}
-}
-
 inline XXH64_hash_t ComputeHash(void* data, size_t size) {
 	return XXH64(data, size, 0);
 	//XXH3 can do 64- or 128-bit hashes, and 128-bit is unnecessary
 }
+
+#pragma pack(push, 1)
 
 struct ArchiveHeader {
 	char magic[8];
@@ -133,7 +127,7 @@ struct ArchivedFileHeader {
 static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
-//TODO: remember to dump in LE!
+#pragma pack(pop)
 
 enum class Q4B_CompressionFileFlags : uint32_t {
 	None                         = 0,
@@ -173,96 +167,5 @@ struct CompressionFile {
 		compression_flags = 0;
 	}
 };
-
-enum class ErrorSeverity {
-	Unknown,
-	info,
-	warn,
-	error,
-	Count
-};
-
-struct ErrorMessage {
-	ErrorSeverity severity;
-	std::string msg;
-};
-
-
-
-/* Removes the files that no longer exist.
- *
- * @param file_list [in,out] List of files to process.
- *
- * @return void
- */
-void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
-
-template <bool extraFeatures>
-void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                           int threadCount, std::vector<ErrorMessage>* messages,
-                           std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
-
-/* Writes the Q4B archive.
- *
- * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
- * @param root_file_path [in] The root which file_list is relative to.
- * @param output [in] Output name of the archive.
- * @param threadCount [in] Number of threads to use, counting the starter thread.
- * @param messages [out,optional] Accumulated error messages. (TODO)
- * @param working_flag [out] Flag to signal if the function is still running.
- * @param exit_flag [in] Flag to signal to the function if it should exit early.
- * @param files_completed [out] Count of files compressed so far.
- *
- * @return void
- */
-inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         int threadCount, std::vector<ErrorMessage>* messages,
-                         std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
-	WriteArchive_internal<true>(file_list, root_file_path, output, threadCount, messages, working_flag, exit_flag, files_completed);
-}
-
-/* Writes the Q4B archive.
- *
- * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
- * @param root_file_path [in] The root which file_list is relative to.
- * @param output [in] Output name of the archive.
- * @param threadCount [in] Number of threads to use, counting the starter thread.
- * @param messages [out,optional] Accumulated error messages. (TODO)
- *
- * @return void
- */
-inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         int threadCount, std::vector<ErrorMessage>* messages) noexcept {
-	WriteArchive_internal<false>(file_list, root_file_path, output, threadCount, messages, nullptr, nullptr, nullptr);
-}
-
-/* Decodes a Q4B archive.
- *
- * @param input [in] Name of the archive.
- * @param output [in] Output folder of the archive.
- *
- * @return void
- */
-void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept;
-
-/* Reads the header of a Q4B archive.
- *
- * @param input [in] Name of the archive.
- * @param header [out] Where to put the archive's header.
- * @param list [out] Where to put the archive's list of files.
- *
- * @return True on success, false on failure.
- */
-bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header, std::vector<ArchivedFileHeader>& list) noexcept;
-
-/* Loads a file into memory. Returns the pointer to the allocated memory.
- *
- * @param filepath [in] The file to load.
- * @param dest [out] The pointer for where the file will be put, allocated using `new[]`. Will not be set on error.
- *
- * @return Size of the file. -1 if error. If the full file couldn't be loaded, returns -1.
- */
-[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept;
 
 } // namespace q4b

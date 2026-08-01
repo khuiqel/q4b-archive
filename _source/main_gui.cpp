@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <SDL3/SDL.h>
 
-#include "q4b.hpp"
+#include "q4b_helpers.hpp"
 #include "gui_data.hpp"
 #include <iostream>
 

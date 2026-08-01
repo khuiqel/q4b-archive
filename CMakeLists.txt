@@ -119,7 +119,9 @@ add_executable(${PROJECT_NAME}
 
 add_executable(${PROJECT_GUI_NAME}
 	_source/q4b.cpp
+	_source/q4b_helpers.cpp
 	_source/compression_schemes.cpp
+	_source/gui/compression_info.cpp
 	_source/gui_data.cpp
 	_source/main_gui.cpp
 
@@ -167,6 +169,7 @@ add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 	tests/archive.cpp
 
 	_source/q4b.cpp
+	_source/q4b_helpers.cpp
 	_source/compression_schemes.cpp
 
 	Externals/xxHash/xxhash.c

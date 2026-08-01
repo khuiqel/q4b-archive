@@ -1,8 +1,8 @@
 #pragma once
 #include <vector>
 #include <imgui.h>
-#include "q4b.hpp"
-#include "compression_schemes.hpp"
+#include "q4b_helpers.hpp"
+#include "gui/compression_info.hpp"
 
 struct GuiData {
 	// Archive stuff
@@ -29,7 +29,7 @@ struct GuiData {
 		return compressionSchemes[compressionScheme_idx]->scheme;
 	}
 	int get_compression_level() const {
-		return compressionSchemes[compressionScheme_idx]->clevel_num[compressionLevel_idx];
+		return compressionSchemes[compressionScheme_idx]->clevel_val[compressionLevel_idx];
 	}
 
 	static void Initialize();
