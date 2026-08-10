@@ -111,6 +111,7 @@ find_package(brotli 1.1.0 REQUIRED)
 
 add_executable(${PROJECT_NAME}
 	_source/q4b.cpp
+	_source/q4b_helpers.cpp
 	_source/compression_schemes.cpp
 	_source/main_cli.cpp
 

@@ -81,6 +81,7 @@ int main(int argc, char** argv) {
 
 	subcom_decompress->add_option("input_file", "Input file")->required();
 	subcom_decompress->add_option("scheme", "Compression scheme (optional override)");
+	subcom_decompress->add_option("-r", "Compression ratio to use if decompressed size can't be determined");
 	subcom_decompress->add_option("-o", "Output folder");
 	subcom_decompress->add_flag("-y", "Overwrite without asking"); //TODO
 	
@@ -149,19 +150,45 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		//TODO
-		void* compressed_file_data;
-		CompressionSchemeFunctions* functions = new CompressionSchemeFunctions_Lz4();
-		uint64_t compressedSize = functions->Compress_GenericExport(std::stoi(LEVEL), WRITE_METADATA ? q4b::Q4B_CompressionFileFlags::DoWriteMetadata : q4b::Q4B_CompressionFileFlags::None, file_data, file_size, &compressed_file_data);
+		CompressionSchemeFunctions* functions;
+		int level;
+		q4b::CompressionScheme scheme;
+		if (SCHEME == "lz4" || SCHEME == "LZ4") {
+			functions = new CompressionSchemeFunctions_Lz4();
+			level = std::stoi(LEVEL);
+			scheme = q4b::CompressionScheme::lz4;
+		} else if (SCHEME == "zstd" || SCHEME == "ZSTD") {
+			functions = new CompressionSchemeFunctions_Zstd();
+			if (LEVEL == "max" || LEVEL == "--max" || LEVEL == "MAX") {
+				level = INT_MAX;
+			} else {
+				level = std::stoi(LEVEL);
+			}
+			scheme = q4b::CompressionScheme::zstd;
+		} else if (SCHEME == "brotli" || SCHEME == "BROTLI") {
+			functions = new CompressionSchemeFunctions_Brotli();
+			level = std::stoi(LEVEL);
+			scheme = q4b::CompressionScheme::brotli;
+		} else {
+			std::cout << "ERROR: unknown scheme\n";
+			return 1;
+		}
 
-		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()) / SchemeToExtension(q4b::CompressionScheme::lz4, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
+		void* compressed_file_data;
+		const q4b::Q4B_CompressionFileFlags flags = WRITE_METADATA ? q4b::Q4B_CompressionFileFlags::DoWriteMetadata : q4b::Q4B_CompressionFileFlags::None;
+		uint64_t compressedSize = functions->Compress_GenericExport(level, flags, file_data, file_size, &compressed_file_data);
+		delete functions;
+
+		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
 		delete[] file_data;
 
 	} else if (subcom == subcom_decompress) {
 
-		/*
 		const std::string INPUT      = subcom_decompress->get_option_no_throw("input_file")->as<std::string>();
-		const std::string SCHEME     = subcom_decompress->get_option_no_throw("scheme")->as<std::string>();
+		const std::string SCHEME     = subcom_decompress->get_option_no_throw("scheme")->empty() ?
+		                               "" : subcom_decompress->get_option_no_throw("scheme")->as<std::string>();
+		const std::string RATIO      = subcom_decompress->get_option_no_throw("-r")->empty() ?
+		                               "" : subcom_decompress->get_option_no_throw("-r")->as<std::string>();
 		const std::string OUTPUT_DIR = subcom_decompress->get_option_no_throw("-o")->empty() ?
 		                               "." : subcom_decompress->get_option_no_throw("-o")->as<std::string>();
 
@@ -172,18 +199,54 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		char* decompressed_file;
-		size_t decompressed_size;
-		if (std::filesystem::path(INPUT).extension() == ".lz4f") {
-			decompressed_size = q4b::DecompressLz4Data_Metadata(file_data, file_size, &decompressed_file, uncompressed_size);
-		} else if (std::filesystem::path(INPUT).extension() == ".lz4") {
-			decompressed_size = q4b::DecompressLz4Data(file_data, file_size, &decompressed_file, uncompressed_size);
+		CompressionSchemeFunctions* functions;
+		q4b::CompressionScheme scheme;
+		if (SCHEME == "") {
+			if (std::filesystem::path(INPUT).extension() == ".lz4f") {
+				//TODO
+				functions = new CompressionSchemeFunctions_Lz4();
+				scheme = q4b::CompressionScheme::lz4;
+			} else if (std::filesystem::path(INPUT).extension() == ".lz4") {
+				functions = new CompressionSchemeFunctions_Lz4();
+				scheme = q4b::CompressionScheme::lz4;
+			} else if (std::filesystem::path(INPUT).extension() == ".zst") {
+				functions = new CompressionSchemeFunctions_Zstd();
+				scheme = q4b::CompressionScheme::zstd;
+			} else if (std::filesystem::path(INPUT).extension() == ".br") {
+				functions = new CompressionSchemeFunctions_Brotli();
+				scheme = q4b::CompressionScheme::brotli;
+			} else {
+				std::cout << "ERROR: could not determine scheme\n";
+				return 1;
+			}
 		} else {
-			//TODO
+			if (SCHEME == "lz4" || SCHEME == "LZ4") {
+				functions = new CompressionSchemeFunctions_Lz4();
+				scheme = q4b::CompressionScheme::lz4;
+			} else if (SCHEME == "zstd" || SCHEME == "ZSTD") {
+				functions = new CompressionSchemeFunctions_Zstd();
+				scheme = q4b::CompressionScheme::zstd;
+			} else if (SCHEME == "brotli" || SCHEME == "BROTLI") {
+				functions = new CompressionSchemeFunctions_Brotli();
+				scheme = q4b::CompressionScheme::brotli;
+			} else {
+				std::cout << "ERROR: unknown scheme\n";
+				return 1;
+			}
+		}
+		float cratio;
+		if (RATIO == "") {
+			cratio = 0;
+		} else {
+			cratio = std::stof(RATIO);
 		}
 
-		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).stem()).string(), decompressed_file, uncompressed_size);
-		*/
+		void* decompressed_file;
+		uint64_t decompressedSize = functions->Decompress_UnknownSize(file_data, file_size, &decompressed_file);
+		delete functions;
+
+		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).stem()).string(), (char*)decompressed_file, decompressedSize);
+		delete[] file_data;
 
 	} else {
 		//oh no
