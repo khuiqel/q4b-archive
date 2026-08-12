@@ -1,4 +1,5 @@
 #include "compression_info.hpp"
+#include <climits> //INT_MAX
 
 void CompressionSchemeData_Uncompressed::Initialize() noexcept {
 	char* str = new char[2];

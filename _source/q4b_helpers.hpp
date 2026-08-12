@@ -1,6 +1,7 @@
 #pragma once
 #include "q4b.hpp"
 
+#include <atomic>
 #include <vector>
 #include <unordered_map>
 

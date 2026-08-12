@@ -95,9 +95,9 @@ endif()
 if(Q4B_ENABLE_BROTLI)
 	set(BROTLI_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 	set(BROTLI_BUILD_FOR_PACKAGE OFF CACHE BOOL "" FORCE)
-	include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
 
 	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
+	include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
 	list(APPEND Q4B_SCHEME_LIBS ${BROTLI_LIBRARIES})
 	add_compile_definitions(Q4B_ENABLE_BROTLI)
 endif()

@@ -8,7 +8,7 @@ As P3A is closed-source (with the file format's header [open source](https://git
 
 ### Name explanation
 
-Q4B is named after P3A, specifically a one letter shift forward. This was inspired by [HAL 9000 being a one letter shift backward of IBM](https://en.wikipedia.org/wiki/HAL_9000#Origin_of_name)... and in whatever sleep-deprived state I was in, I thought IBM named itself after HAL, so that's why Q4B is a one letter shift forward of P3A, instead of being named "O2Z." (Also "O2Z" could easily get confused with [`-O2` and `-Oz`](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html), or so I've rationalized to myself.) That sleep-deprived state did have a nugget of rationality, because [HAL Labratories (best-known for making the Kirby games) did name itself as a one letter shift backwards from IBM](https://en.wikipedia.org/wiki/HAL_Laboratory#History), or at least that was one explanation given.
+Q4B is named after P3A, specifically a one letter shift forward. This was inspired by [HAL 9000 being a one letter shift backward of IBM](https://en.wikipedia.org/wiki/HAL_9000#Origin_of_name)... and in whatever sleep-deprived state I was in, I thought IBM named itself after HAL, so that's why Q4B is a one letter shift forward of P3A, instead of being named "O2Z." (Also "O2Z" could easily get confused with [`-O2` and `-Oz`](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html), or so I've rationalized to myself.)
 
 ## BIG DISCLAIMER
 

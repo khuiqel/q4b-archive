@@ -464,17 +464,18 @@ int main(int argc, char** argv)
 
 					ImGui::NewLine();
 					if (ImGui::TreeNodeEx("Enabled Schemes", ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DefaultOpen)) {
+						ImGui::BulletText("Uncompressed");
 						#ifdef Q4B_ENABLE_LZ4
-						ImGui::TextUnformatted("LZ4");
+						ImGui::BulletText("LZ4");
 						#endif
 						#ifdef Q4B_ENABLE_ZSTD
-						ImGui::TextUnformatted("Zstd");
+						ImGui::BulletText("Zstd");
 						#endif
 						#ifdef Q4B_ENABLE_BROTLI
-						ImGui::TextUnformatted("Brotli");
+						ImGui::BulletText("Brotli");
 						#endif
 						#ifdef Q4B_ENABLE_STB
-						ImGui::TextUnformatted("stb");
+						ImGui::BulletText("stb");
 						#endif
 						ImGui::TreePop();
 					}

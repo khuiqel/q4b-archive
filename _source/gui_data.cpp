@@ -1,7 +1,6 @@
 #include "gui_data.hpp"
 #include <algorithm>
 #include <string>
-#include <climits> //INT_MAX
 #include <thread> //hardware_concurrency
 
 int GuiData::threadCountMax = 1;
