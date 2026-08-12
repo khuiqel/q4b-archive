@@ -14,6 +14,99 @@ constexpr int THREAD_COUNT = 4;
 
 namespace {
 
+TEST(ArchiveStructs, SetPath) {
+	q4b::ArchivedFileHeader file_header;
+	file_header.setPath("a");
+
+	ASSERT_TRUE(file_header.path[0] == 'a');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
+
+	bool allZeros = true;
+	for (int i = 1; i < q4b::Q4B_MAX_PATH-1; i++) {
+		if (file_header.path[i] != '\0') {
+			allZeros = false;
+			break;
+		}
+	}
+	EXPECT_TRUE(allZeros);
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[q4b::Q4B_MAX_PATH-2] = 'a';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, SetPathLong) {
+	q4b::ArchivedFileHeader file_header;
+
+	std::string longPath = "";
+	constexpr int longPathLength = 300;
+	static_assert(longPathLength > q4b::Q4B_MAX_PATH);
+
+	for (int i = 0; i < longPathLength; i++) {
+		longPath += "a";
+	}
+	file_header.setPath(longPath);
+
+	ASSERT_TRUE(file_header.path[0] == 'a');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
+	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-2] == 'a');
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[q4b::Q4B_MAX_PATH-1] = 'a';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, SetPathBackslash) {
+	q4b::ArchivedFileHeader file_header;
+
+	std::string backslashPath = TEST_FILE.string();
+	std::replace(backslashPath.begin(), backslashPath.end(), '/', '\\');
+	file_header.setPath(backslashPath);
+
+	ASSERT_TRUE(file_header.path[0] != '\0');
+
+	bool backslashPresent = false;
+	for (int i = 0; i < q4b::Q4B_MAX_PATH; i++) {
+		if (file_header.path[i] == '\\') {
+			backslashPresent = true;
+			break;
+		}
+	}
+	EXPECT_FALSE(backslashPresent);
+	EXPECT_TRUE(file_header.pathIsValid());
+
+	file_header.path[0] = '\\';
+	EXPECT_FALSE(file_header.pathIsValid());
+}
+
+TEST(ArchiveStructs, CompressionFileFlags) {
+	// Test constructors
+	q4b::CompressionFile file1;
+	ASSERT_TRUE(file1.compression_flags == 0);
+	q4b::CompressionFile file2 = { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 };
+	ASSERT_TRUE(file2.compression_flags == 0);
+
+	// Test one flag set/unset
+	q4b::CompressionFile file3;
+	file3.setFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
+	ASSERT_TRUE(file3.compression_flags != 0);
+	EXPECT_TRUE(file3.getFlag((q4b::Q4B_CompressionFileFlags) 0b01000000));
+	EXPECT_TRUE(std::popcount(file3.compression_flags) == 1);
+	file3.unsetFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
+	ASSERT_TRUE(file3.compression_flags == 0);
+
+	// Test multiple flags
+	q4b::CompressionFile file4;
+	constexpr auto multi_flags = (q4b::Q4B_CompressionFileFlags) 0b01010110;
+	file4.setFlag(multi_flags);
+	EXPECT_TRUE(file4.compression_flags != 0);
+	EXPECT_TRUE(file4.getFlag(multi_flags)); // TODO: Call it getFlags()?
+	EXPECT_TRUE(std::popcount(file4.compression_flags) == 4);
+	file4.unsetFlag(multi_flags);
+	EXPECT_TRUE(file4.compression_flags == 0);
+}
+
+
 TEST(WriteArchive, NoFiles) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -215,97 +308,5 @@ TEST(WriteArchive, Lz4MetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
 #endif
-
-TEST(ArchiveStructs, SetPath) {
-	q4b::ArchivedFileHeader file_header;
-	file_header.setPath("a");
-
-	ASSERT_TRUE(file_header.path[0] == 'a');
-	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
-
-	bool allZeros = true;
-	for (int i = 1; i < q4b::Q4B_MAX_PATH-1; i++) {
-		if (file_header.path[i] != '\0') {
-			allZeros = false;
-			break;
-		}
-	}
-	EXPECT_TRUE(allZeros);
-	EXPECT_TRUE(file_header.pathIsValid());
-
-	file_header.path[q4b::Q4B_MAX_PATH-2] = 'a';
-	EXPECT_FALSE(file_header.pathIsValid());
-}
-
-TEST(ArchiveStructs, SetPathLong) {
-	q4b::ArchivedFileHeader file_header;
-
-	std::string longPath = "";
-	constexpr int longPathLength = 300;
-	static_assert(longPathLength > q4b::Q4B_MAX_PATH);
-
-	for (int i = 0; i < longPathLength; i++) {
-		longPath += "a";
-	}
-	file_header.setPath(longPath);
-
-	ASSERT_TRUE(file_header.path[0] == 'a');
-	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-1] == '\0');
-	EXPECT_TRUE(file_header.path[q4b::Q4B_MAX_PATH-2] == 'a');
-	EXPECT_TRUE(file_header.pathIsValid());
-
-	file_header.path[q4b::Q4B_MAX_PATH-1] = 'a';
-	EXPECT_FALSE(file_header.pathIsValid());
-}
-
-TEST(ArchiveStructs, SetPathBackslash) {
-	q4b::ArchivedFileHeader file_header;
-
-	std::string backslashPath = TEST_FILE.string();
-	std::replace(backslashPath.begin(), backslashPath.end(), '/', '\\');
-	file_header.setPath(backslashPath);
-
-	ASSERT_TRUE(file_header.path[0] != '\0');
-
-	bool backslashPresent = false;
-	for (int i = 0; i < q4b::Q4B_MAX_PATH; i++) {
-		if (file_header.path[i] == '\\') {
-			backslashPresent = true;
-			break;
-		}
-	}
-	EXPECT_FALSE(backslashPresent);
-	EXPECT_TRUE(file_header.pathIsValid());
-
-	file_header.path[0] = '\\';
-	EXPECT_FALSE(file_header.pathIsValid());
-}
-
-TEST(ArchiveStructs, CompressionFileFlags) {
-	// Test constructors
-	q4b::CompressionFile file1;
-	ASSERT_TRUE(file1.compression_flags == 0);
-	q4b::CompressionFile file2 = { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 };
-	ASSERT_TRUE(file2.compression_flags == 0);
-
-	// Test one flag set/unset
-	q4b::CompressionFile file3;
-	file3.setFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
-	ASSERT_TRUE(file3.compression_flags != 0);
-	EXPECT_TRUE(file3.getFlag((q4b::Q4B_CompressionFileFlags) 0b01000000));
-	EXPECT_TRUE(std::popcount(file3.compression_flags) == 1);
-	file3.unsetFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
-	ASSERT_TRUE(file3.compression_flags == 0);
-
-	// Test multiple flags
-	q4b::CompressionFile file4;
-	constexpr auto multi_flags = (q4b::Q4B_CompressionFileFlags) 0b01010110;
-	file4.setFlag(multi_flags);
-	EXPECT_TRUE(file4.compression_flags != 0);
-	EXPECT_TRUE(file4.getFlag(multi_flags)); // TODO: Call it getFlags()?
-	EXPECT_TRUE(std::popcount(file4.compression_flags) == 4);
-	file4.unsetFlag(multi_flags);
-	EXPECT_TRUE(file4.compression_flags == 0);
-}
 
 } // namespace
