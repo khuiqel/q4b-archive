@@ -7,6 +7,7 @@ set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
 option(Q4B_ENABLE_LZ4    "Enable LZ4 compression and decompression" ON)
 option(Q4B_ENABLE_ZSTD   "Enable Zstd compression and decompression" ON)
 option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
+option(Q4B_ENABLE_STB    "Enable stb_compress compression and decompression" ON)
 set(Q4B_SCHEME_LIBS)
 option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF)
 
@@ -99,6 +100,11 @@ if(Q4B_ENABLE_BROTLI)
 	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS ${BROTLI_LIBRARIES})
 	add_compile_definitions(Q4B_ENABLE_BROTLI)
+endif()
+
+if(Q4B_ENABLE_STB)
+	include_directories(PRIVATE Externals/stb)
+	add_compile_definitions(Q4B_ENABLE_STB)
 endif()
 
 # These don't work because the packages don't provide the CMake files to find their libs/dirs, or something:

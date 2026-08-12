@@ -17,6 +17,7 @@ static std::string SchemeToExtension(q4b::CompressionScheme scheme, bool metadat
 		case q4b::CompressionScheme::lz4:          return (metadata ? ".lz4f" : ".lz4"); //TODO
 		case q4b::CompressionScheme::zstd:         return ".zst";
 		case q4b::CompressionScheme::brotli:       return ".br";
+		case q4b::CompressionScheme::stb:          return ".stb"; //TODO
 	}
 }
 
@@ -48,6 +49,9 @@ int main(int argc, char** argv) {
 	#endif
 	#ifdef Q4B_ENABLE_BROTLI
 	", Brotli"
+	#endif
+	#ifdef Q4B_ENABLE_STB
+	", stb"
 	#endif
 	;
 
@@ -169,6 +173,10 @@ int main(int argc, char** argv) {
 			functions = new CompressionSchemeFunctions_Brotli();
 			level = std::stoi(LEVEL);
 			scheme = q4b::CompressionScheme::brotli;
+		} else if (SCHEME == "stb" || SCHEME == "STB" || SCHEME == "stb_compress") {
+			functions = new CompressionSchemeFunctions_Stb();
+			level = std::stoi(LEVEL);
+			scheme = q4b::CompressionScheme::stb;
 		} else {
 			std::cout << "ERROR: unknown scheme\n";
 			return 1;
@@ -215,6 +223,9 @@ int main(int argc, char** argv) {
 			} else if (std::filesystem::path(INPUT).extension() == ".br") {
 				functions = new CompressionSchemeFunctions_Brotli();
 				scheme = q4b::CompressionScheme::brotli;
+			} else if (std::filesystem::path(INPUT).extension() == ".stb") { //TODO
+				functions = new CompressionSchemeFunctions_Stb();
+				scheme = q4b::CompressionScheme::stb;
 			} else {
 				std::cout << "ERROR: could not determine scheme\n";
 				return 1;
@@ -229,6 +240,9 @@ int main(int argc, char** argv) {
 			} else if (SCHEME == "brotli" || SCHEME == "BROTLI") {
 				functions = new CompressionSchemeFunctions_Brotli();
 				scheme = q4b::CompressionScheme::brotli;
+			} else if (SCHEME == "stb" || SCHEME == "STB" || SCHEME == "stb_compress") {
+				functions = new CompressionSchemeFunctions_Stb();
+				scheme = q4b::CompressionScheme::stb;
 			} else {
 				std::cout << "ERROR: unknown scheme\n";
 				return 1;

@@ -473,6 +473,9 @@ int main(int argc, char** argv)
 						#ifdef Q4B_ENABLE_BROTLI
 						ImGui::TextUnformatted("Brotli");
 						#endif
+						#ifdef Q4B_ENABLE_STB
+						ImGui::TextUnformatted("stb");
+						#endif
 						ImGui::TreePop();
 					}
 

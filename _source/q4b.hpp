@@ -38,6 +38,7 @@ enum class CompressionScheme : uint32_t {
 	bzip2,
 	zlib, //implemented using miniz
 	lz4_dict,
+	stb,
 	//OpenZL, //https://github.com/facebook/openzl
 	CountExtraEnd,
 };
@@ -52,6 +53,9 @@ constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
 	#endif
 	#ifdef Q4B_ENABLE_BROTLI
 	CompressionScheme::brotli,
+	#endif
+	#ifdef Q4B_ENABLE_STB
+	CompressionScheme::stb,
 	#endif
 };
 
@@ -77,6 +81,7 @@ inline const char* CompressionToStr(CompressionScheme c) {
 		// case CompressionScheme::bzip2:        return "bzip2";
 		// case CompressionScheme::zlib:         return "zlib";
 		// case CompressionScheme::lz4_dict:     return "LZ4_dict";
+		case CompressionScheme::stb:          return "stb";
 	}
 }
 

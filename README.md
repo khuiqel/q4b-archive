@@ -117,6 +117,7 @@ GNU General Public License v3.0
 * [LZ4](https://github.com/lz4/lz4): BSD-2-Clause and GPLv2+
 * [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [Brotli](https://github.com/google/brotli): MIT
+* [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h): MIT or The Unlicense
 * [Noto Sans](https://notofonts.github.io/): [SIL OFL 1.1](https://openfontlicense.org/open-font-license-official-text/)
 
 ## Acknowledgments

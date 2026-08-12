@@ -147,3 +147,23 @@ struct CompressionSchemeData_Zlib final : public CompressionSchemeData {
 	void Initialize() noexcept override;
 };
 */
+
+#ifdef Q4B_ENABLE_STB
+struct CompressionSchemeData_Stb final : public CompressionSchemeData {
+	CompressionSchemeData_Stb() {
+		scheme = q4b::CompressionScheme::stb;
+		displayName = "stb";
+		internalName = "stb";
+		searchNames = { "stb", "STB", "stb_compress" };
+		isDictionaryScheme = false;
+
+		recommendation = CompressionSchemeRecommendedLevel::Awful;
+		usableForGenericExport = false;
+		supportsMetadata = false;
+		information_text = "A basic LZ77 compression scheme. Unmaintained by STB.\n"
+		                   "Only notably used by Dear Imgui its embedded fonts, because the compressor/decompressor is small.";
+		// As stb.h is poorly documented, the information was gathered from: https://github.com/jrk/stb/blob/master/stb_compress.txt
+	}
+	void Initialize() noexcept override;
+};
+#endif

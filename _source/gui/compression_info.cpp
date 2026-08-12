@@ -100,3 +100,13 @@ void CompressionSchemeData_Zlib::Initialize() noexcept {
 	//TODO
 }
 */
+
+#ifdef Q4B_ENABLE_STB
+void CompressionSchemeData_Stb::Initialize() noexcept {
+	char* str = new char[2];
+	str[0] = '0'; str[1] = '\0';
+	clevel_str.push_back(str);
+	clevel_val.push_back(0);
+	clevel_default_idx = 0;
+}
+#endif

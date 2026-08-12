@@ -229,3 +229,42 @@ CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
 	//TODO?
 }
 #endif
+
+#ifdef Q4B_ENABLE_STB
+#define STB_DEFINE
+#include <deprecated/stb.h>
+
+uint64_t CompressionSchemeFunctions_Stb::GetMaxSize() const {
+	//TODO: real limit is 4GB?
+	return INT64_MAX;
+}
+
+uint64_t CompressionSchemeFunctions_Stb::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	uint64_t compressedBufSize = uncompressedSize + 512 + (uncompressedSize >> 2); // Size from stb_compress_tofile()/stb_compress_intofile(), which is a "total guess"
+	*outputData = new char[compressedBufSize];
+	stb_uint compressedSize = stb_compress((unsigned char*)(*outputData), (unsigned char*)inputData, uncompressedSize); // Note: inputData isn't const...
+	return compressedSize;
+}
+
+uint64_t CompressionSchemeFunctions_Stb::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	// No frame format or other metadata
+	return Compress(clevel, flags, inputData, uncompressedSize, outputData);
+}
+
+uint64_t CompressionSchemeFunctions_Stb::Decompress(const void* inputData, uint64_t compressedSize, void** outputData, uint64_t originalSize) const noexcept {
+	*outputData = new char[originalSize];
+	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (unsigned char*)inputData, compressedSize);
+	return decompressedSize;
+}
+
+uint64_t CompressionSchemeFunctions_Stb::Decompress_UnknownSize(const void* inputData, uint64_t compressedSize, void** outputData) const noexcept {
+	stb_uint decompressedBufSize = stb_decompress_length((unsigned char*)inputData) + 1; // Size from stb_decompress_fromfile()
+	*outputData = new char[decompressedBufSize];
+	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (unsigned char*)inputData, compressedSize);
+	return decompressedSize;
+}
+
+CompressionSchemeFunctions_Stb::~CompressionSchemeFunctions_Stb() {
+	//TODO?
+}
+#endif

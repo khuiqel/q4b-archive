@@ -171,6 +171,21 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 				break;
 			}
 			#endif
+
+			#ifdef Q4B_ENABLE_STB
+			case CompressionScheme::stb: {
+				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					messages->push_back({ ErrorSeverity::warn, "stb_compress doesn't support writing metadata" });
+				}
+				CompressionSchemeFunctions* stb_functions = new CompressionSchemeFunctions_Stb();
+				uint64_t compressedSize = stb_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
+				file_header.compressed_size = compressedSize;
+				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
+				delete stb_functions;
+				delete[] file_data;
+				break;
+			}
+			#endif
 		}
 
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
@@ -362,6 +377,23 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 				CompressionSchemeFunctions* brotli_functions = new CompressionSchemeFunctions_Brotli();
 				uint64_t decompressedSize = brotli_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
 				delete brotli_functions;
+				if (decompressedSize != file_header.uncompressed_size) {
+					std::cout << "file size mismatch!\n";
+					//TODO
+				}
+				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
+				outfile.write((const char*)outputData, decompressedSize);
+				outfile.close();
+				break;
+			}
+			#endif
+
+			#ifdef Q4B_ENABLE_STB
+			case CompressionScheme::stb: {
+				void* outputData;
+				CompressionSchemeFunctions* stb_functions = new CompressionSchemeFunctions_Stb();
+				uint64_t decompressedSize = stb_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
+				delete stb_functions;
 				if (decompressedSize != file_header.uncompressed_size) {
 					std::cout << "file size mismatch!\n";
 					//TODO
