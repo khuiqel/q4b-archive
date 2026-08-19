@@ -1,4 +1,4 @@
-#include "compression_schemes.hpp"
+#include "compression_data.hpp"
 #include <climits> //INT_MAX
 #include <iostream>
 

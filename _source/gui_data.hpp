@@ -2,7 +2,7 @@
 #include <vector>
 #include <imgui.h>
 #include "q4b_helpers.hpp"
-#include "gui/compression_info.hpp"
+#include "app/compression_info.hpp"
 
 struct GuiData {
 	// Archive stuff

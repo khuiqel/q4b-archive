@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include "q4b_helpers.hpp"
-#include "compression_schemes.hpp"
+#include "lib/compression_data.hpp"
 
 static void WriteFile(const std::filesystem::path& output, const char* data, size_t size) {
 	std::ofstream o(output, std::ios::binary);

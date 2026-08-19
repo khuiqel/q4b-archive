@@ -118,7 +118,8 @@ find_package(brotli 1.1.0 REQUIRED)
 add_executable(${PROJECT_NAME}
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/compression_schemes.cpp
+	_source/app/compression_info.cpp
+	_source/lib/compression_data.cpp
 	_source/main_cli.cpp
 
 	Externals/xxHash/xxhash.c
@@ -127,8 +128,8 @@ add_executable(${PROJECT_NAME}
 add_executable(${PROJECT_GUI_NAME}
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/compression_schemes.cpp
-	_source/gui/compression_info.cpp
+	_source/app/compression_info.cpp
+	_source/lib/compression_data.cpp
 	_source/gui_data.cpp
 	_source/main_gui.cpp
 
@@ -177,7 +178,7 @@ add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/compression_schemes.cpp
+	_source/lib/compression_data.cpp
 
 	Externals/xxHash/xxhash.c
 )

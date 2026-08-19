@@ -63,12 +63,6 @@ void CompressionSchemeData_Zstd::Initialize() noexcept {
 	clevel_str.push_back(level_str);
 	clevel_val.push_back(INT_MAX);
 }
-
-/*
-void CompressionSchemeData_Zstd_Dict::Initialize() noexcept {
-	//TODO
-}
-*/
 #endif
 
 #ifdef Q4B_ENABLE_BROTLI
@@ -95,12 +89,6 @@ void CompressionSchemeData_Brotli::Initialize() noexcept {
 	}
 }
 #endif
-
-/*
-void CompressionSchemeData_Zlib::Initialize() noexcept {
-	//TODO
-}
-*/
 
 #ifdef Q4B_ENABLE_STB
 void CompressionSchemeData_Stb::Initialize() noexcept {

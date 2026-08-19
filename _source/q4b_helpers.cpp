@@ -5,7 +5,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "compression_schemes.hpp"
+#include "lib/compression_data.hpp"
 
 namespace q4b {
 
