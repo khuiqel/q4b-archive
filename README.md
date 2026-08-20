@@ -14,6 +14,13 @@ Q4B is named after P3A, specifically a one letter shift forward. This was inspir
 
 Q4B is under active development. Do not use it for anything serious. Who knows what could happen if it tries to decode an ill-formatted archive.
 
+## Supported compression schemes
+
+* [LZ4](https://github.com/lz4/lz4)
+* [Zstd](https://github.com/facebook/zstd)
+* [Brotli](https://github.com/google/brotli)
+* [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h)
+
 ## Building
 
 0. Prerequisites: a compiler with C++23 support, CMake >=3.20
@@ -22,7 +29,7 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 	* The `CMakeLists.txt` file sets the instruction set to SSE4.2 by default. If your CPU doesn't have that, change it.
 	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier. The tests do require C++23 (or honestly C++20).
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
-	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options.
+	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, and GoogleTest for the tests.
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
 
@@ -44,7 +51,7 @@ Running:
 
 ### Windows
 
-Currently only Visual Studio is officially supported.
+Only Visual Studio is officially supported.
 
 Compiling using CMake:
 
@@ -59,6 +66,13 @@ Compiling using Visual Studio:
 1. Build `q4b-gui` and/or `q4b`
 1. Run (press F5 or Ctrl+F5); defaults to `q4b-gui`, so if you want to run `q4b`, right click its Project and select "Set as Startup Project"
 
+MSYS2 is also supported, though it's not tested regularly:
+
+* Generate the CMake files with MinGW: `cmake -S . -B build -G "MinGW Makefiles"`
+	* Note: You will have to `del "build\CMakeCache.txt"` if you already generated the CMake files
+* `cmake --build build -j%NUMBER_OF_PROCESSORS% --target <q4b-gui or q4b>`
+* `"build/<q4b or q4b-gui>.exe"`
+
 ## Running the tests
 
 Linux:
@@ -68,7 +82,8 @@ Linux:
 
 Windows:
 
-* CMake: `cmake --build build --config Release --target q4b-tests` & `"build/Release/q4b-tests.exe"`
+* CMake (MSVC): `cmake --build build --config Release --target q4b-tests` then `"build/Release/q4b-tests.exe"`
+* CMake (MSYS2): `cmake --build build --target q4b-tests` then `"build/q4b-tests.exe"`
 * Visual Studio: Build `q4b-tests` then run it
 
 ## Benchmarking Utility (TODO)
@@ -78,22 +93,19 @@ Test out the various compression schemes, comparing the compression time vs. siz
 ## Stuff that works
 
 * drag and drop files to build list
-* compress files using Zstd and LZ4 (or uncompressed), mostly
-
-## Stuff that doesn't work
-
-* compression level of the files
-* hashing
+* compress/decompress files using: LZ4, Zstd, Brotli
+* set the files' compression level
 
 ## Unordered TODO list
 
+* dictionary compression
+* CMake: always Release on the submodules
 * SDL: drop files only in the box (instead of the entire window)
-* fix monitor scaling not changing window size (seems to be an ImGui issue with SDL3)
 * *robustness*
 * force Endianness when creating/decoding archives
 * benchmarks to make graph for compression level vs time vs space
-* tests
 * much other stuff
+* streaming files when compressing/decompressing
 * P3A compatibility mode?
 * set git submodules to shallow
 
@@ -111,8 +123,8 @@ GNU General Public License v3.0
 
 * [SDL (Simple DirectMedia Layer)](https://www.libsdl.org/): zlib
 * [Dear ImGui](https://github.com/ocornut/imgui): MIT
-* [GoogleTest](https://github.com/google/googletest): BSD-3-Clause
 * [CLI11](https://github.com/CLIUtils/CLI11): BSD-3-Clause
+* [GoogleTest](https://github.com/google/googletest): BSD-3-Clause
 * [xxHash](https://github.com/Cyan4973/xxHash): BSD-2-Clause
 * [LZ4](https://github.com/lz4/lz4): BSD-2-Clause and GPLv2+
 * [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
