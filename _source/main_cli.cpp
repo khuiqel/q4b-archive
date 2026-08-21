@@ -2,6 +2,7 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 #include "q4b_helpers.hpp"
 #include "lib/compression_data.hpp"
 
@@ -82,16 +83,18 @@ int main(int argc, char** argv) {
 	subcom_compress->add_option("-o", "Output folder");
 	subcom_compress->add_flag("-m", "Do NOT write metadata (frame header)");
 	subcom_compress->add_flag("-y", "Overwrite without asking"); //TODO
+	subcom_compress->add_option_group("")->add_flag("--bench", "Benchmark mode");
 
 	subcom_decompress->add_option("input_file", "Input file")->required();
 	subcom_decompress->add_option("scheme", "Compression scheme (optional override)");
 	subcom_decompress->add_option("-r", "Compression ratio to use if decompressed size can't be determined");
 	subcom_decompress->add_option("-o", "Output folder");
 	subcom_decompress->add_flag("-y", "Overwrite without asking"); //TODO
-	
+	subcom_decompress->add_option_group("")->add_flag("--bench", "Benchmark mode");
+
 	CLI11_PARSE(app, argc, argv);
 
-	auto* subcom = app.get_subcommands()[0];
+	CLI::App* subcom = app.get_subcommands()[0];
 	if (subcom == subcom_archive) {
 
 		const std::string FILES      = subcom_archive->get_option_no_throw("input_file")->as<std::string>();
@@ -145,12 +148,13 @@ int main(int argc, char** argv) {
 		const std::string OUTPUT_DIR = subcom_compress->get_option_no_throw("-o")->empty() ?
 		                               "." : subcom_compress->get_option_no_throw("-o")->as<std::string>();
 		const bool WRITE_METADATA = subcom_compress->get_option_no_throw("-m")->empty();
+		const bool BENCHMARK_MODE = subcom_compress->get_option_no_throw("--bench")->as<bool>();
 
 		// if (std::filesystem::exists(INPUT) && std::filesystem::is_directory(OUTPUT_DIR)) {
 		char* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
-			std::cout << "ERROR: file not found\n";
+			std::cerr << "ERROR: file not found\n";
 			return 1;
 		}
 
@@ -178,17 +182,26 @@ int main(int argc, char** argv) {
 			level = std::stoi(LEVEL);
 			scheme = q4b::CompressionScheme::stb;
 		} else {
-			std::cout << "ERROR: unknown scheme\n";
+			std::cerr << "ERROR: unknown scheme\n";
 			return 1;
 		}
 
 		void* compressed_file_data;
 		const q4b::Q4B_CompressionFileFlags flags = WRITE_METADATA ? q4b::Q4B_CompressionFileFlags::DoWriteMetadata : q4b::Q4B_CompressionFileFlags::None;
+		auto timeStart = std::chrono::steady_clock::now();
 		uint64_t compressedSize = functions->Compress_GenericExport(level, flags, file_data, file_size, &compressed_file_data);
-		delete functions;
+		auto timeEnd = std::chrono::steady_clock::now();
+		auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart); //TODO: microseconds?
 
-		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
-		delete[] file_data;
+		if (BENCHMARK_MODE) {
+			std::cout << timeDiff;
+			// Don't bother cleaning up
+		} else {
+			delete functions;
+			WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
+			delete[] file_data;
+			std::cout << "Compressed in " << timeDiff << std::endl;
+		}
 
 	} else if (subcom == subcom_decompress) {
 
@@ -203,7 +216,7 @@ int main(int argc, char** argv) {
 		char* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
-			std::cout << "ERROR: file not found\n";
+			std::cerr << "ERROR: file not found\n";
 			return 1;
 		}
 
@@ -227,7 +240,7 @@ int main(int argc, char** argv) {
 				functions = new CompressionSchemeFunctions_Stb();
 				scheme = q4b::CompressionScheme::stb;
 			} else {
-				std::cout << "ERROR: could not determine scheme\n";
+				std::cerr << "ERROR: could not determine scheme\n";
 				return 1;
 			}
 		} else {
@@ -244,7 +257,7 @@ int main(int argc, char** argv) {
 				functions = new CompressionSchemeFunctions_Stb();
 				scheme = q4b::CompressionScheme::stb;
 			} else {
-				std::cout << "ERROR: unknown scheme\n";
+				std::cerr << "ERROR: unknown scheme\n";
 				return 1;
 			}
 		}

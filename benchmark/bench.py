@@ -1,7 +1,6 @@
 import sys, os
 import argparse
 import subprocess
-import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-exe", metavar="exe", help="Path to q4b.exe", required=True)
@@ -36,12 +35,34 @@ data = []
 for scheme, level in SCHEMES:
 	times = []
 	for _ in range(RUN_COUNT + int(SKIP_FIRST_RUN)):
-		start_time = time.time()
-		subprocess.run([EXECUTABLE, "compress", FILE, scheme, level, "-o", OUTPUT_DIR])
-		end_time = time.time()
-		times.append(end_time - start_time)
+		result = subprocess.run([EXECUTABLE, "compress", FILE, scheme, level, "-o", OUTPUT_DIR, "--bench"], capture_output=True, text=True)
+
+		valid_output = False
+		if len(result.stdout) == 2:
+			if result.stdout[1] == 's' and result.stdout[0].isdecimal():
+				valid_output = True
+		elif len(result.stdout) > 2:
+			if result.stdout[-1] == 's' and (result.stdout[-2] in ['n', 'u', 'm'] or result.stdout[-2].isdecimal()) and result.stdout[:-2].isdecimal():
+				valid_output = True
+		# Regex version: "[0-9]+[num]?s"
+		if not valid_output:
+			sys.exit("ERROR: Could not compress file")
+
+		seconds = 0
+		if result.stdout[-2] == 'n':
+			seconds = int(result.stdout[:-2]) / 1E9
+		elif result.stdout[-2] == 'u':
+			seconds = int(result.stdout[:-2]) / 1E6
+		elif result.stdout[-2] == 'm':
+			seconds = int(result.stdout[:-2]) / 1E3
+		else:
+			seconds = int(result.stdout[:-1])
+
+		times.append(seconds)
+
 	if SKIP_FIRST_RUN:
 		times = times[1:]
-	data.append((round(sum(times) / RUN_COUNT, 4), round(os.path.getsize(FILE) / os.path.getsize(OUTPUT_DIR + FILE + "." + scheme), 4)))
+	# data.append((round(sum(times) / RUN_COUNT, 4), round(os.path.getsize(FILE) / os.path.getsize(OUTPUT_DIR + FILE + "." + scheme), 4)))
+	data.append(round(sum(times) / RUN_COUNT, 4))
 
 print(data)
