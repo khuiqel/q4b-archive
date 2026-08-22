@@ -194,7 +194,9 @@ int main(int argc, char** argv) {
 		auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart); //TODO: microseconds?
 
 		if (BENCHMARK_MODE) {
-			std::cout << timeDiff;
+			std::cout << timeDiff << '\n'
+			          << file_size << '\n' // Only outputting this to be ultra-robust
+			          << compressedSize;
 			// Don't bother cleaning up
 		} else {
 			delete functions;
