@@ -8,7 +8,8 @@ parser.add_argument("-exe", metavar="exe", help="Path to q4b.exe", required=True
 parser.add_argument("input_file", help="The file to test")
 parser.add_argument("run_count", type=int, help="Number of times to run the benchmark")
 parser.add_argument("-warm", help="Specify this to run one extra run, throwing out the first result, as it's probably a cold run which can impact performance.", action="store_true", required=False)
-# parser.add_argument("-p", help="How to output the data. Options are \"print\" (default), \"csv\", and \"plot\" (requires matplotlib)", required=False)
+parser.add_argument("-p", metavar="", help="How to output the data. Options are \"print\" (default), \"csv\", and \"plot\" (requires matplotlib).", required=False)
+parser.add_argument("-pout", metavar="name", help="Output file name. Default is \"output\", and the extension is automatically added.", default="output", required=False)
 parser.add_argument("formats", nargs="*", help="List of formats to run. Needs the scheme and compression level. (examples: lz4 9 zstd 3-19 brotli 0,11)")
 args = parser.parse_args()
 
@@ -106,8 +107,29 @@ for scheme, level in SCHEMES:
 	if SKIP_FIRST_RUN:
 		times = times[1:]
 
-	avg_time = round(sum(times) / RUN_COUNT, 4)
-	ratio = round(original_size / compressed_size, 4) if compressed_size else 0
-	data.append((scheme, level, avg_time, ratio))
+	avg_time = sum(times) / RUN_COUNT
+	ratio = (original_size / compressed_size) if compressed_size else 0
+	data.append([scheme + " " + level, avg_time, ratio])
 
-print("\n".join(map(str, data)))
+if args.p == "csv":
+	import csv
+	with open(args.pout + ".csv", newline='\n', mode='w') as csvfile:
+		writer = csv.writer(csvfile)
+		writer.writerow(["Scheme and Level", "Time (s)", "Compression Ratio"])
+		for run in data:
+			writer.writerow(run)
+
+elif args.p == "plot":
+	try:
+		import matplotlib.pyplot as plt
+	except ImportError:
+		sys.exit("Could not import matplotlib")
+
+	#TODO
+	pass
+
+else:
+	for run in data:
+		for i in range(1, len(run)):
+			run[i] = round(run[i], 4)
+	print("\n".join(map(str, data)))
