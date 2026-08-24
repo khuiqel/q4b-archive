@@ -86,9 +86,13 @@ Windows:
 * CMake (MSYS2): `cmake --build build --target q4b-tests` then `"build/q4b-tests.exe"`
 * Visual Studio: Build `q4b-tests` then run it
 
-## Benchmarking Utility (TODO)
+## Benchmarking Utility
 
 Test out the various compression schemes, comparing the compression time vs. size! Outputs a CSV, or can generate a plot if you have `matplotlib`.
+
+![example graph](benchmark-example.png)
+
+(Note: LZ4 generic decompression currently doesn't work...)
 
 ## Stuff that works
 
