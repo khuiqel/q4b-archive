@@ -11,50 +11,28 @@ uint64_t CompressionSchemeFunctions_Lz4::GetMaxSize() const {
 	return LZ4_MAX_INPUT_SIZE;
 }
 
-uint64_t CompressionSchemeFunctions_Lz4::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+template <bool GenericExport>
+static uint64_t CompressionFunction_Lz4(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) noexcept {
 	uint64_t compressedSize;
 	if (flags & q4b::Q4B_CompressionFileFlags::DoWriteMetadata) {
 		// Setup
 		LZ4F_preferences_t prefs = {}; // LZ4F_INIT_PREFERENCES will set to the defaults, but 0 is also interpreted as default
 		prefs.compressionLevel = clevel;
-		// prefs.frameInfo.contentSize = uncompressedSize; // This writes 8 extra bytes
 
-		// No need to write checksums because the archive already does that
-		prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum; // Default already 0
-		prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum; // Default already 0
+		if constexpr (GenericExport) {
+			prefs.frameInfo.contentSize = uncompressedSize; // This writes 8 extra bytes
+			prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+			prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+		} else {
+			prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum; // Default already 0
+			prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum; // Default already 0
+		}
 
 		// Compress
 		uint64_t compressedBufSize = LZ4F_compressFrameBound(uncompressedSize, &prefs);
 		*outputData = new char[compressedBufSize];
 		compressedSize = LZ4F_compressFrame(*outputData, compressedBufSize, inputData, uncompressedSize, &prefs);
 		// HC compression function follows LZ4's old parameter order, but frame compression follows Zstd's...
-	} else {
-		// Compress
-		//TODO: loop LZ4_MAX_INPUT_SIZE at a time
-		int compressedBufSize = LZ4_compressBound(uncompressedSize);
-		*outputData = new char[compressedBufSize];
-		compressedSize = LZ4_compress_HC((const char*)inputData, (char*)(*outputData), uncompressedSize, compressedBufSize, clevel);
-	}
-
-	return compressedSize;
-}
-
-uint64_t CompressionSchemeFunctions_Lz4::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
-	uint64_t compressedSize;
-	if (flags & q4b::Q4B_CompressionFileFlags::DoWriteMetadata) {
-		// Setup
-		LZ4F_preferences_t prefs = {};
-		prefs.compressionLevel = clevel;
-		prefs.frameInfo.contentSize = uncompressedSize;
-
-		// Supposed to add checksums
-		prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
-		prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
-
-		// Compress
-		uint64_t compressedBufSize = LZ4F_compressFrameBound(uncompressedSize, &prefs);
-		*outputData = new char[compressedBufSize];
-		compressedSize = LZ4F_compressFrame(*outputData, compressedBufSize, inputData, uncompressedSize, &prefs);
 	} else {
 		// Compress (TODO)
 		//TODO: loop LZ4_MAX_INPUT_SIZE at a time
@@ -64,6 +42,14 @@ uint64_t CompressionSchemeFunctions_Lz4::Compress_GenericExport(int clevel, q4b:
 	}
 
 	return compressedSize;
+}
+
+uint64_t CompressionSchemeFunctions_Lz4::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	return CompressionFunction_Lz4<false>(clevel, flags, inputData, uncompressedSize, outputData);
+}
+
+uint64_t CompressionSchemeFunctions_Lz4::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	return CompressionFunction_Lz4<true>(clevel, flags, inputData, uncompressedSize, outputData);
 }
 
 uint64_t CompressionSchemeFunctions_Lz4::Decompress(const void* inputData, uint64_t compressedSize, void** outputData, uint64_t originalSize) const noexcept {
@@ -136,7 +122,8 @@ static inline void zstd_setMaxCompression(ZSTD_CCtx* cctx) {
 	// ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, ZSTD_maxCLevel());
 }
 
-uint64_t CompressionSchemeFunctions_Zstd::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+template <bool GenericExport>
+static uint64_t CompressionFunction_Zstd(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) noexcept {
 	ZSTD_CCtx* cctx = ZSTD_createCCtx();
 	ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 1); //TODO
 	if (clevel == INT_MAX) [[unlikely]] {
@@ -146,15 +133,15 @@ uint64_t CompressionSchemeFunctions_Zstd::Compress(int clevel, q4b::Q4B_Compress
 		// Other parameters are automatically set given the compression level (that would've been a huge headache otherwise)
 	}
 
-	if (flags & q4b::Q4B_CompressionFileFlags::DoWriteMetadata) {
+	if constexpr (GenericExport) {
 		ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 1); // Default already 1
 		ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-		ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
 	} else {
 		ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0);
 		ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0); // Default already 0
-		ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
 	}
+	ZSTD_CCtx_setParameter(cctx, ZSTD_c_dictIDFlag, 0); // Not necessary
+	(void) flags;
 
 	uint64_t compressedBufSize = ZSTD_compressBound(uncompressedSize);
 	*outputData = new char[compressedBufSize];
@@ -163,9 +150,12 @@ uint64_t CompressionSchemeFunctions_Zstd::Compress(int clevel, q4b::Q4B_Compress
 	return compressedSize;
 }
 
+uint64_t CompressionSchemeFunctions_Zstd::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	return CompressionFunction_Zstd<false>(clevel, flags, inputData, uncompressedSize, outputData);
+}
+
 uint64_t CompressionSchemeFunctions_Zstd::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
-	//TODO
-	return 0;
+	return CompressionFunction_Zstd<true>(clevel, flags, inputData, uncompressedSize, outputData);
 }
 
 uint64_t CompressionSchemeFunctions_Zstd::Decompress(const void* inputData, uint64_t compressedSize, void** outputData, uint64_t originalSize) const noexcept {
@@ -210,8 +200,8 @@ uint64_t CompressionSchemeFunctions_Brotli::Compress(int clevel, q4b::Q4B_Compre
 }
 
 uint64_t CompressionSchemeFunctions_Brotli::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
-	//TODO (Brotli doesn't have a frame format)
-	return 0;
+	// Brotli doesn't have a frame format
+	return Compress(clevel, flags, inputData, uncompressedSize, outputData);
 }
 
 uint64_t CompressionSchemeFunctions_Brotli::Decompress(const void* inputData, uint64_t compressedSize, void** outputData, uint64_t originalSize) const noexcept {
@@ -222,8 +212,10 @@ uint64_t CompressionSchemeFunctions_Brotli::Decompress(const void* inputData, ui
 }
 
 uint64_t CompressionSchemeFunctions_Brotli::Decompress_UnknownSize(const void* inputData, uint64_t compressedSize, void** outputData) const noexcept {
-	//TODO
-	return 0;
+	*outputData = new char[compressedSize * 10]; //TODO
+	size_t size = compressedSize * 10;
+	BrotliDecoderResult ret = BrotliDecoderDecompress(compressedSize, (const uint8_t*)inputData, &size, (uint8_t*)(*outputData));
+	return size;
 }
 
 CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
