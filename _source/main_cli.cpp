@@ -15,11 +15,12 @@ static std::string SchemeToExtension(q4b::CompressionScheme scheme, bool metadat
 	switch (scheme) {
 		default: [[fallthrough]];
 		case q4b::CompressionScheme::Uncompressed: return ".uncompressed"; //TODO
-		case q4b::CompressionScheme::lz4:          return (metadata ? ".lz4f" : ".lz4"); //TODO
+		case q4b::CompressionScheme::lz4:          return ".lz4"; //TODO
 		case q4b::CompressionScheme::zstd:         return ".zst";
 		case q4b::CompressionScheme::brotli:       return ".br";
 		case q4b::CompressionScheme::stb:          return ".stb"; //TODO
 	}
+	(void) metadata;
 }
 
 static void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<q4b::CompressionFile>& file_list) {
@@ -196,7 +197,13 @@ int main(int argc, char** argv) {
 		if (BENCHMARK_MODE) {
 			std::cout << timeDiff << '\n'
 			          << file_size << '\n' // Only outputting this to be ultra-robust
-			          << compressedSize;
+			          << compressedSize << '\n';
+			if (!subcom_compress->get_option_no_throw("-o")->empty()) {
+				// If -o was specified, it's to decompress in a later benchmark run
+				std::string output = (OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA);
+				WriteFile(output, (char*)compressed_file_data, compressedSize);
+				std::cout << output;
+			}
 			// Don't bother cleaning up
 		} else {
 			delete functions;
@@ -214,6 +221,7 @@ int main(int argc, char** argv) {
 		                               "" : subcom_decompress->get_option_no_throw("-r")->as<std::string>();
 		const std::string OUTPUT_DIR = subcom_decompress->get_option_no_throw("-o")->empty() ?
 		                               "." : subcom_decompress->get_option_no_throw("-o")->as<std::string>();
+		const bool BENCHMARK_MODE = subcom_decompress->get_option_no_throw("--bench")->as<bool>();
 
 		char* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
@@ -271,11 +279,23 @@ int main(int argc, char** argv) {
 		}
 
 		void* decompressed_file;
+		auto timeStart = std::chrono::steady_clock::now();
 		uint64_t decompressedSize = functions->Decompress_UnknownSize(file_data, file_size, &decompressed_file);
-		delete functions;
+		auto timeEnd = std::chrono::steady_clock::now();
+		auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart); //TODO: microseconds?
 
-		WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).stem()).string(), (char*)decompressed_file, decompressedSize);
-		delete[] file_data;
+		if (BENCHMARK_MODE) {
+			std::cout << timeDiff << '\n'
+			          << file_size << '\n' // Only outputting this to be ultra-robust
+			          << decompressedSize << '\n'
+			          << q4b::CompressionToStr(scheme);
+			// Don't bother cleaning up
+		} else {
+			delete functions;
+			WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).stem()).string(), (char*)decompressed_file, decompressedSize);
+			delete[] file_data;
+			std::cout << "Decompressed in " << timeDiff << std::endl;
+		}
 
 	} else {
 		//oh no
