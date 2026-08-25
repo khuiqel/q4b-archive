@@ -69,11 +69,11 @@ struct CompressionSchemeData_Lz4 final : public CompressionSchemeData {
 		recommendation = CompressionSchemeRecommendedLevel::Best;
 		displayName = "LZ4";
 		informationText = "Decent compression ratio, great compression speed, and EXTREMELY fast decompression speed.\n\n"
-		                  "Note that this program uses LZ4HC when not adding metadata and LZ4F when adding metadata. They produce slightly different results.";
+		                  "Note that this program uses LZ4F for generic exports and LZ4HC for Q4B archives. They produce slightly different results.";
 
-		helpText = "TODO";
+		helpText = "clevels: 1-12";
 		searchNames = { "LZ4", "lz4" };
-		fileExtensions = { ".lz4", ".lz4f" }; //TODO
+		fileExtensions = { ".lz4" };
 	}
 	void Initialize() noexcept override;
 };
@@ -92,8 +92,8 @@ struct CompressionSchemeData_Zstd final : public CompressionSchemeData {
 		informationText = "Great compression ratio and great decompression speed. Good compression speed.\n"
 		                  "Created by Yann Collet, who also created LZ4 and is a core maintainer of OpenZL.";
 
-		helpText = "TODO";
-		searchNames = { "Zstd", "zstd", "ZSTD" };
+		helpText = "clevels: 1-22 & max";
+		searchNames = { "Zstd", "zstd", "ZSTD", "Zstandard" };
 		fileExtensions = { ".zst" };
 	}
 	void Initialize() noexcept override;
@@ -128,9 +128,9 @@ struct CompressionSchemeData_Brotli final : public CompressionSchemeData {
 
 		recommendation = CompressionSchemeRecommendedLevel::Good;
 		displayName = "Brotli";
-		informationText = "A bit faster than single-threaded Zstd while having a bit worse compression ratio. Successor to gzip. Designed for font files and text.";
+		informationText = "A bit faster than single-threaded Zstd while having a bit worse compression ratio. Successor to gzip. Designed for font files and HTML text.";
 
-		helpText = "TODO";
+		helpText = "clevels: 0-11";
 		searchNames = { "Brotli", "brotli" };
 		fileExtensions = { ".br" };
 	}
@@ -171,9 +171,9 @@ struct CompressionSchemeData_Stb final : public CompressionSchemeData {
 		                  "Only notably used by Dear Imgui for its embedded fonts, because the compressor/decompressor is small.";
 		// As stb.h is poorly documented, the information was gathered from: https://github.com/jrk/stb/blob/master/stb_compress.txt
 
-		helpText = "TODO";
+		helpText = "clevels: none";
 		searchNames = { "stb", "STB", "stb_compress" };
-		fileExtensions = { ".stb" }; //TODO
+		fileExtensions = { ".stb" };
 	}
 	void Initialize() noexcept override;
 };

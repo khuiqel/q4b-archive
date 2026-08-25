@@ -4,6 +4,7 @@
 #include <fstream>
 #include <chrono>
 #include "q4b_helpers.hpp"
+#include "app/compression_info.hpp"
 #include "lib/compression_data.hpp"
 
 static void WriteFile(const std::filesystem::path& output, const char* data, size_t size) {
@@ -11,16 +12,95 @@ static void WriteFile(const std::filesystem::path& output, const char* data, siz
 	o.write(data, size);
 }
 
-static std::string SchemeToExtension(q4b::CompressionScheme scheme, bool metadata) {
-	switch (scheme) {
-		default: [[fallthrough]];
-		case q4b::CompressionScheme::Uncompressed: return ".uncompressed"; //TODO
-		case q4b::CompressionScheme::lz4:          return ".lz4"; //TODO
-		case q4b::CompressionScheme::zstd:         return ".zst";
-		case q4b::CompressionScheme::brotli:       return ".br";
-		case q4b::CompressionScheme::stb:          return ".stb"; //TODO
+CompressionSchemeData* SCHEME_DATA[] = {
+	new CompressionSchemeData_Uncompressed(),
+	#ifdef Q4B_ENABLE_LZ4
+	new CompressionSchemeData_Lz4(),
+	#endif
+	#ifdef Q4B_ENABLE_ZSTD
+	new CompressionSchemeData_Zstd(),
+	#endif
+	#ifdef Q4B_ENABLE_BROTLI
+	new CompressionSchemeData_Brotli(),
+	#endif
+	#ifdef Q4B_ENABLE_STB
+	new CompressionSchemeData_Stb(),
+	#endif
+};
+
+// Returns 1 on failure, sets scheme on success
+static int ExtToScheme(const std::string& FILE_EXT, q4b::CompressionScheme* scheme) {
+	for (const CompressionSchemeData* info : SCHEME_DATA) {
+		for (const auto& ext : info->fileExtensions) {
+			if (FILE_EXT == ext) {
+				*scheme = info->scheme;
+				return 0;
+			}
+		}
 	}
-	(void) metadata;
+	std::cerr << "ERROR: could not determine scheme\n";
+	return 1;
+}
+
+// Returns 1 on failure, sets scheme on success
+static int StrToScheme(const std::string& SCHEME, q4b::CompressionScheme* scheme) {
+	for (const CompressionSchemeData* info : SCHEME_DATA) {
+		for (const auto& name : info->searchNames) {
+			if (SCHEME == name) {
+				*scheme = info->scheme;
+				return 0;
+			}
+		}
+	}
+	std::cerr << "ERROR: unknown scheme\n";
+	return 1;
+}
+
+// Returns 1 on failure, sets functions on success
+static int SchemeToFunctions(q4b::CompressionScheme scheme, CompressionSchemeFunctions** functions) {
+	switch (scheme) {
+		default:
+			std::cerr << "ERROR: unsupported scheme\n";
+			return 1;
+
+		case q4b::CompressionScheme::Uncompressed:
+			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
+			return 1;
+
+		#ifdef Q4B_ENABLE_LZ4
+		case q4b::CompressionScheme::lz4:
+			*functions = new CompressionSchemeFunctions_Lz4();
+			break;
+		#endif
+
+		#ifdef Q4B_ENABLE_ZSTD
+		case q4b::CompressionScheme::zstd:
+			*functions = new CompressionSchemeFunctions_Zstd();
+			break;
+		#endif
+
+		#ifdef Q4B_ENABLE_BROTLI
+		case q4b::CompressionScheme::brotli:
+			*functions = new CompressionSchemeFunctions_Brotli();
+			break;
+		#endif
+
+		#ifdef Q4B_ENABLE_STB
+		case q4b::CompressionScheme::stb:
+			*functions = new CompressionSchemeFunctions_Stb();
+			break;
+		#endif
+	}
+	return 0;
+}
+
+static std::string SchemeToFileExt(q4b::CompressionScheme scheme) {
+	for (const CompressionSchemeData* info : SCHEME_DATA) {
+		if (scheme == info->scheme) {
+			return info->fileExtensions[0];
+		}
+	}
+	return "";
 }
 
 static void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<q4b::CompressionFile>& file_list) {
@@ -159,32 +239,24 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		CompressionSchemeFunctions* functions;
-		int level;
 		q4b::CompressionScheme scheme;
-		if (SCHEME == "lz4" || SCHEME == "LZ4") {
-			functions = new CompressionSchemeFunctions_Lz4();
-			level = std::stoi(LEVEL);
-			scheme = q4b::CompressionScheme::lz4;
-		} else if (SCHEME == "zstd" || SCHEME == "ZSTD") {
-			functions = new CompressionSchemeFunctions_Zstd();
+		int ret;
+		ret = StrToScheme(SCHEME, &scheme);
+		if (ret) { return 1; }
+
+		CompressionSchemeFunctions* functions;
+		ret = SchemeToFunctions(scheme, &functions);
+		if (ret) { return 1; }
+
+		int level;
+		if (scheme == q4b::CompressionScheme::zstd) {
 			if (LEVEL == "max" || LEVEL == "--max" || LEVEL == "MAX") {
 				level = INT_MAX;
 			} else {
 				level = std::stoi(LEVEL);
 			}
-			scheme = q4b::CompressionScheme::zstd;
-		} else if (SCHEME == "brotli" || SCHEME == "BROTLI") {
-			functions = new CompressionSchemeFunctions_Brotli();
-			level = std::stoi(LEVEL);
-			scheme = q4b::CompressionScheme::brotli;
-		} else if (SCHEME == "stb" || SCHEME == "STB" || SCHEME == "stb_compress") {
-			functions = new CompressionSchemeFunctions_Stb();
-			level = std::stoi(LEVEL);
-			scheme = q4b::CompressionScheme::stb;
 		} else {
-			std::cerr << "ERROR: unknown scheme\n";
-			return 1;
+			level = std::stoi(LEVEL);
 		}
 
 		void* compressed_file_data;
@@ -200,14 +272,14 @@ int main(int argc, char** argv) {
 			          << compressedSize << '\n';
 			if (!subcom_compress->get_option_no_throw("-o")->empty()) {
 				// If -o was specified, it's to decompress in a later benchmark run
-				std::string output = (OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA);
+				std::string output = (OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToFileExt(scheme);
 				WriteFile(output, (char*)compressed_file_data, compressedSize);
 				std::cout << output;
 			}
 			// Don't bother cleaning up
 		} else {
 			delete functions;
-			WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToExtension(scheme, WRITE_METADATA), (char*)compressed_file_data, compressedSize);
+			WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).filename()).string() + SchemeToFileExt(scheme), (char*)compressed_file_data, compressedSize);
 			delete[] file_data;
 			std::cout << "Compressed in " << timeDiff << std::endl;
 		}
@@ -230,53 +302,25 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		CompressionSchemeFunctions* functions;
 		q4b::CompressionScheme scheme;
+		int ret;
 		if (SCHEME == "") {
-			if (std::filesystem::path(INPUT).extension() == ".lz4f") {
-				//TODO
-				functions = new CompressionSchemeFunctions_Lz4();
-				scheme = q4b::CompressionScheme::lz4;
-			} else if (std::filesystem::path(INPUT).extension() == ".lz4") {
-				functions = new CompressionSchemeFunctions_Lz4();
-				scheme = q4b::CompressionScheme::lz4;
-			} else if (std::filesystem::path(INPUT).extension() == ".zst") {
-				functions = new CompressionSchemeFunctions_Zstd();
-				scheme = q4b::CompressionScheme::zstd;
-			} else if (std::filesystem::path(INPUT).extension() == ".br") {
-				functions = new CompressionSchemeFunctions_Brotli();
-				scheme = q4b::CompressionScheme::brotli;
-			} else if (std::filesystem::path(INPUT).extension() == ".stb") { //TODO
-				functions = new CompressionSchemeFunctions_Stb();
-				scheme = q4b::CompressionScheme::stb;
-			} else {
-				std::cerr << "ERROR: could not determine scheme\n";
-				return 1;
-			}
+			ret = ExtToScheme(std::filesystem::path(INPUT).extension().string(), &scheme);
 		} else {
-			if (SCHEME == "lz4" || SCHEME == "LZ4") {
-				functions = new CompressionSchemeFunctions_Lz4();
-				scheme = q4b::CompressionScheme::lz4;
-			} else if (SCHEME == "zstd" || SCHEME == "ZSTD") {
-				functions = new CompressionSchemeFunctions_Zstd();
-				scheme = q4b::CompressionScheme::zstd;
-			} else if (SCHEME == "brotli" || SCHEME == "BROTLI") {
-				functions = new CompressionSchemeFunctions_Brotli();
-				scheme = q4b::CompressionScheme::brotli;
-			} else if (SCHEME == "stb" || SCHEME == "STB" || SCHEME == "stb_compress") {
-				functions = new CompressionSchemeFunctions_Stb();
-				scheme = q4b::CompressionScheme::stb;
-			} else {
-				std::cerr << "ERROR: unknown scheme\n";
-				return 1;
-			}
+			ret = StrToScheme(SCHEME, &scheme);
 		}
-		float cratio;
-		if (RATIO == "") {
-			cratio = 0;
-		} else {
-			cratio = std::stof(RATIO);
-		}
+		if (ret) { return 1; }
+
+		CompressionSchemeFunctions* functions;
+		ret = SchemeToFunctions(scheme, &functions);
+		if (ret) { return 1; }
+
+		// float cratio;
+		// if (RATIO == "") {
+		// 	cratio = 0;
+		// } else {
+		// 	cratio = std::stof(RATIO);
+		// }
 
 		void* decompressed_file;
 		auto timeStart = std::chrono::steady_clock::now();
@@ -292,7 +336,7 @@ int main(int argc, char** argv) {
 			// Don't bother cleaning up
 		} else {
 			delete functions;
-			WriteFile((OUTPUT_DIR / std::filesystem::path(INPUT).stem()).string(), (char*)decompressed_file, decompressedSize);
+			WriteFile(OUTPUT_DIR / std::filesystem::path(INPUT).stem(), (char*)decompressed_file, decompressedSize);
 			delete[] file_data;
 			std::cout << "Decompressed in " << timeDiff << std::endl;
 		}
