@@ -12,6 +12,7 @@ static void WriteFile(const std::filesystem::path& output, const char* data, siz
 	o.write(data, size);
 }
 
+//TODO: CLI and GUI and q4b_helpers should share this
 CompressionSchemeInfo* SCHEME_INFO[] = {
 	new CompressionSchemeInfo_Uncompressed(),
 	#ifdef Q4B_ENABLE_LZ4
@@ -54,44 +55,6 @@ static int StrToScheme(const std::string& SCHEME, q4b::CompressionScheme* scheme
 	}
 	std::cerr << "ERROR: unknown scheme\n";
 	return 1;
-}
-
-// Returns 1 on failure, sets functions on success
-static int SchemeToFunctions(q4b::CompressionScheme scheme, CompressionSchemeFunctions** functions) {
-	switch (scheme) {
-		default:
-			std::cerr << "ERROR: unsupported scheme\n";
-			return 1;
-
-		case q4b::CompressionScheme::Uncompressed:
-			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
-			return 1;
-
-		#ifdef Q4B_ENABLE_LZ4
-		case q4b::CompressionScheme::lz4:
-			*functions = new CompressionSchemeFunctions_Lz4();
-			break;
-		#endif
-
-		#ifdef Q4B_ENABLE_ZSTD
-		case q4b::CompressionScheme::zstd:
-			*functions = new CompressionSchemeFunctions_Zstd();
-			break;
-		#endif
-
-		#ifdef Q4B_ENABLE_BROTLI
-		case q4b::CompressionScheme::brotli:
-			*functions = new CompressionSchemeFunctions_Brotli();
-			break;
-		#endif
-
-		#ifdef Q4B_ENABLE_STB
-		case q4b::CompressionScheme::stb:
-			*functions = new CompressionSchemeFunctions_Stb();
-			break;
-		#endif
-	}
-	return 0;
 }
 
 static std::string SchemeToFileExt(q4b::CompressionScheme scheme) {
@@ -244,9 +207,16 @@ int main(int argc, char** argv) {
 		ret = StrToScheme(SCHEME, &scheme);
 		if (ret) { return 1; }
 
-		CompressionSchemeFunctions* functions;
-		ret = SchemeToFunctions(scheme, &functions);
-		if (ret) { return 1; }
+		if (scheme == q4b::CompressionScheme::Uncompressed) {
+			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
+			return 1;
+		}
+
+		CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
+		if (functions == nullptr) {
+			std::cerr << "ERROR: unsupported scheme\n";
+			return 1;
+		}
 
 		int level;
 		if (scheme == q4b::CompressionScheme::zstd) {
@@ -311,9 +281,16 @@ int main(int argc, char** argv) {
 		}
 		if (ret) { return 1; }
 
-		CompressionSchemeFunctions* functions;
-		ret = SchemeToFunctions(scheme, &functions);
-		if (ret) { return 1; }
+		if (scheme == q4b::CompressionScheme::Uncompressed) {
+			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
+			return 1;
+		}
+
+		CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
+		if (functions == nullptr) {
+			std::cerr << "ERROR: unsupported scheme\n";
+			return 1;
+		}
 
 		// float cratio;
 		// if (RATIO == "") {

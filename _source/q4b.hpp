@@ -58,6 +58,7 @@ constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
 	CompressionScheme::stb,
 	#endif
 };
+constexpr size_t ENABLED_SCHEMES_COUNT = std::size(LIST_OF_ENABLED_SCHEMES);
 
 inline bool SchemeIsEnabled(CompressionScheme c) {
 	// If you want an O(1) lookup instead of O(n), use a switch statement

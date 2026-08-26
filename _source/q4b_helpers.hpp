@@ -1,9 +1,10 @@
 #pragma once
 #include "q4b.hpp"
+#include "lib/compression_data.hpp"
 
 #include <atomic>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace q4b {
 
@@ -19,6 +20,14 @@ struct ErrorMessage {
 	ErrorSeverity severity;
 	std::string msg;
 };
+
+/* Translates the compression scheme to the compression/decompression functions.
+ *
+ * @param scheme [in] Compression scheme.
+ *
+ * @return Pointer to functions struct, allocated using `new`. nullptr on failure.
+ */
+CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme);
 
 /* Removes the files that no longer exist.
  *

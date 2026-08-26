@@ -116,24 +116,22 @@ find_package(brotli 1.1.0 REQUIRED)
 #]]
 
 add_executable(${PROJECT_NAME}
-	_source/q4b.cpp
-	_source/q4b_helpers.cpp
 	_source/app/compression_info.cpp
 	_source/lib/compression_data.cpp
+	_source/q4b.cpp
+	_source/q4b_helpers.cpp
 	_source/main_cli.cpp
 
 	Externals/xxHash/xxhash.c
 )
 
 add_executable(${PROJECT_GUI_NAME}
-	_source/q4b.cpp
-	_source/q4b_helpers.cpp
 	_source/app/compression_info.cpp
 	_source/lib/compression_data.cpp
 	_source/gui_data.cpp
+	_source/q4b.cpp
+	_source/q4b_helpers.cpp
 	_source/main_gui.cpp
-
-	Externals/xxHash/xxhash.c
 
 	Externals/imgui/imgui.cpp
 	Externals/imgui/imgui_demo.cpp
@@ -142,6 +140,8 @@ add_executable(${PROJECT_GUI_NAME}
 	Externals/imgui/imgui_widgets.cpp
 	Externals/imgui/backends/imgui_impl_sdl3.cpp
 	Externals/imgui/backends/imgui_impl_sdlrenderer3.cpp
+
+	Externals/xxHash/xxhash.c
 )
 
 #TODO: is MSVC+Clang a special case?
@@ -176,9 +176,10 @@ add_subdirectory(Externals/googletest EXCLUDE_FROM_ALL)
 add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 	tests/archive.cpp
 
+	_source/app/compression_info.cpp
+	_source/lib/compression_data.cpp
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/lib/compression_data.cpp
 
 	Externals/xxHash/xxhash.c
 )

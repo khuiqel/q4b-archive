@@ -5,9 +5,37 @@
 #include <fstream>
 #include <iostream>
 
-#include "lib/compression_data.hpp"
+#include "app/compression_info.hpp"
 
 namespace q4b {
+
+CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme) {
+	switch (scheme) {
+		case q4b::CompressionScheme::Uncompressed: [[fallthrough]];
+		default:
+			return nullptr;
+
+		#ifdef Q4B_ENABLE_LZ4
+		case q4b::CompressionScheme::lz4:
+			return new CompressionSchemeFunctions_Lz4();
+		#endif
+
+		#ifdef Q4B_ENABLE_ZSTD
+		case q4b::CompressionScheme::zstd:
+			return new CompressionSchemeFunctions_Zstd();
+		#endif
+
+		#ifdef Q4B_ENABLE_BROTLI
+		case q4b::CompressionScheme::brotli:
+			return new CompressionSchemeFunctions_Brotli();
+		#endif
+
+		#ifdef Q4B_ENABLE_STB
+		case q4b::CompressionScheme::stb:
+			return new CompressionSchemeFunctions_Stb();
+		#endif
+	}
+}
 
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 	auto it = std::remove_if(file_list.begin(), file_list.end(),
@@ -17,6 +45,34 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 		}
 	);
 	file_list.erase(it, file_list.end());
+}
+
+//TODO: CLI and GUI and q4b_helpers should share this
+CompressionSchemeInfo* SCHEME_INFO[] = {
+	new CompressionSchemeInfo_Uncompressed(),
+	#ifdef Q4B_ENABLE_LZ4
+	new CompressionSchemeInfo_Lz4(),
+	#endif
+	#ifdef Q4B_ENABLE_ZSTD
+	new CompressionSchemeInfo_Zstd(),
+	#endif
+	#ifdef Q4B_ENABLE_BROTLI
+	new CompressionSchemeInfo_Brotli(),
+	#endif
+	#ifdef Q4B_ENABLE_STB
+	new CompressionSchemeInfo_Stb(),
+	#endif
+};
+static_assert(std::size(SCHEME_INFO) == ENABLED_SCHEMES_COUNT);
+
+// Don't delete the return value!
+static CompressionSchemeInfo* SchemeToInfo(CompressionScheme scheme) {
+	for (CompressionSchemeInfo* info : SCHEME_INFO) {
+		if (scheme == info->scheme) {
+			return info;
+		}
+	}
+	return nullptr;
 }
 
 template <bool extraFeatures>
@@ -119,73 +175,29 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		file_header.uncompressed_size = file_size;
 		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
 
-		switch (file.data.compression_type) {
-			default:
-				//TODO: fail instead
-				messages->push_back({ ErrorSeverity::warn, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
-				file_header.compression_type = CompressionScheme::Uncompressed;
-				[[fallthrough]];
-			case CompressionScheme::Uncompressed: {
-				compressed_files_data[i] = file_data;
-				file_header.compressed_size = file_header.uncompressed_size;
-				file_header.compressed_hash = file_header.uncompressed_hash;
-				break;
+		CompressionSchemeFunctions* functions = SchemeToFunctions(file.data.compression_type);
+		if (file.data.compression_type == CompressionScheme::Uncompressed) {
+			compressed_files_data[i] = file_data;
+			file_header.compressed_size = file_header.uncompressed_size;
+			file_header.compressed_hash = file_header.uncompressed_hash;
+		} else if (functions == nullptr) {
+			//TODO: this shouldn't happen but it should quit
+			messages->push_back({ ErrorSeverity::error, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
+			file_header.compression_type = CompressionScheme::Uncompressed;
+			compressed_files_data[i] = file_data;
+		} else {
+			CompressionSchemeInfo* info = SchemeToInfo(file.data.compression_type);
+			if (!info->usableForGenericExport) {
+				//TODO
+				messages->push_back({ ErrorSeverity::warn, std::string(info->displayName) + " doesn't support writing metadata" });
 			}
 
-			#ifdef Q4B_ENABLE_LZ4
-			case CompressionScheme::lz4: {
-				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
-				uint64_t compressedSize = lz4_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
-				file_header.compressed_size = compressedSize;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
-				delete lz4_functions;
-				delete[] file_data;
-				break;
-			}
-			#endif
+			uint64_t compressedSize = functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
+			file_header.compressed_size = compressedSize;
+			file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
 
-			#ifdef Q4B_ENABLE_ZSTD
-			case CompressionScheme::zstd: {
-				CompressionSchemeFunctions* zstd_functions = new CompressionSchemeFunctions_Zstd();
-				uint64_t compressedSize = zstd_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
-				file_header.compressed_size = compressedSize;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
-				delete zstd_functions;
-				delete[] file_data;
-				break;
-			}
-			#endif
-
-			#ifdef Q4B_ENABLE_BROTLI
-			case CompressionScheme::brotli: {
-				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
-					messages->push_back({ ErrorSeverity::warn, "Brotli doesn't support writing metadata" });
-					// The blocks have a header, but Brotli doesn't have a frame format
-				}
-				CompressionSchemeFunctions* brotli_functions = new CompressionSchemeFunctions_Brotli();
-				uint64_t compressedSize = brotli_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
-				file_header.compressed_size = compressedSize;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
-				delete brotli_functions;
-				delete[] file_data;
-				break;
-			}
-			#endif
-
-			#ifdef Q4B_ENABLE_STB
-			case CompressionScheme::stb: {
-				if (file.getFlag(Q4B_CompressionFileFlags::DoWriteMetadata)) {
-					messages->push_back({ ErrorSeverity::warn, "stb_compress doesn't support writing metadata" });
-				}
-				CompressionSchemeFunctions* stb_functions = new CompressionSchemeFunctions_Stb();
-				uint64_t compressedSize = stb_functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
-				file_header.compressed_size = compressedSize;
-				file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
-				delete stb_functions;
-				delete[] file_data;
-				break;
-			}
-			#endif
+			delete functions;
+			delete[] file_data;
 		}
 
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
@@ -322,88 +334,25 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 	for (int i = 0; i < ah.num_files; i++) {
 		const ArchivedFileHeader& file_header = compressed_files_headers[i];
 
-		switch (file_header.compression_type) {
-			default:
-				//TODO: fail instead
-				std::cerr << "ERROR: Unknown compression: " << q4b::CompressionToStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
-				[[fallthrough]];
-			case CompressionScheme::Uncompressed: {
-				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)compressed_files_data[i], file_header.compressed_size);
-				outfile.close();
-				//TODO: should probably check hashes and size again, since the compressed_size could equal the uncompressed size on ill-formatted data
-				break;
+		CompressionSchemeFunctions* functions = SchemeToFunctions(file_header.compression_type);
+		if (file_header.compression_type == CompressionScheme::Uncompressed) {
+			std::ofstream outfile(output / std::filesystem::path(file_header.path).filename(), std::ios::binary);
+			outfile.write((const char*)compressed_files_data[i], file_header.compressed_size);
+			outfile.close();
+			//TODO: should probably check hashes and size again, since the compressed_size could not equal the uncompressed size on ill-formatted data
+		} else if (functions == nullptr) {
+			std::cerr << "ERROR: Unknown compression: " << q4b::CompressionToStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
+		} else {
+			void* outputData;
+			uint64_t decompressedSize = functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
+			delete functions;
+			if (decompressedSize != file_header.uncompressed_size) {
+				std::cout << "file size mismatch!\n";
+				//TODO
 			}
-
-			#ifdef Q4B_ENABLE_LZ4
-			case CompressionScheme::lz4: {
-				void* outputData;
-				CompressionSchemeFunctions* lz4_functions = new CompressionSchemeFunctions_Lz4();
-				uint64_t decompressedSize = lz4_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
-				delete lz4_functions;
-				if (decompressedSize != file_header.uncompressed_size) {
-					std::cout << "file size mismatch!\n";
-					//TODO
-				}
-				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)outputData, decompressedSize);
-				outfile.close();
-				break;
-			}
-			#endif
-
-			#ifdef Q4B_ENABLE_ZSTD
-			case CompressionScheme::zstd: {
-				// Zstd doesn't care about the metadata, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
-				void* outputData;
-				CompressionSchemeFunctions* zstd_functions = new CompressionSchemeFunctions_Zstd();
-				uint64_t decompressedSize = zstd_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
-				delete zstd_functions;
-				if (decompressedSize != file_header.uncompressed_size) {
-					std::cout << "file size mismatch!\n";
-					//TODO
-				}
-				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)outputData, decompressedSize);
-				outfile.close();
-				break;
-			}
-			#endif
-
-			#ifdef Q4B_ENABLE_BROTLI
-			case CompressionScheme::brotli: {
-				// Brotli doesn't have a frame format, so no need to check for Q4B_ArchivedFileFlags::MetadataEmbedded
-				void* outputData;
-				CompressionSchemeFunctions* brotli_functions = new CompressionSchemeFunctions_Brotli();
-				uint64_t decompressedSize = brotli_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
-				delete brotli_functions;
-				if (decompressedSize != file_header.uncompressed_size) {
-					std::cout << "file size mismatch!\n";
-					//TODO
-				}
-				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)outputData, decompressedSize);
-				outfile.close();
-				break;
-			}
-			#endif
-
-			#ifdef Q4B_ENABLE_STB
-			case CompressionScheme::stb: {
-				void* outputData;
-				CompressionSchemeFunctions* stb_functions = new CompressionSchemeFunctions_Stb();
-				uint64_t decompressedSize = stb_functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
-				delete stb_functions;
-				if (decompressedSize != file_header.uncompressed_size) {
-					std::cout << "file size mismatch!\n";
-					//TODO
-				}
-				std::ofstream outfile(output.string() + "/" + std::filesystem::path(file_header.path).filename().string(), std::ios::binary);
-				outfile.write((const char*)outputData, decompressedSize);
-				outfile.close();
-				break;
-			}
-			#endif
+			std::ofstream outfile(output / std::filesystem::path(file_header.path).filename(), std::ios::binary);
+			outfile.write((const char*)outputData, decompressedSize);
+			outfile.close();
 		}
 
 		// std::cout << "uncompressed " << i << "\n";
