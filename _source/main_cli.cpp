@@ -12,25 +12,25 @@ static void WriteFile(const std::filesystem::path& output, const char* data, siz
 	o.write(data, size);
 }
 
-CompressionSchemeData* SCHEME_DATA[] = {
-	new CompressionSchemeData_Uncompressed(),
+CompressionSchemeInfo* SCHEME_INFO[] = {
+	new CompressionSchemeInfo_Uncompressed(),
 	#ifdef Q4B_ENABLE_LZ4
-	new CompressionSchemeData_Lz4(),
+	new CompressionSchemeInfo_Lz4(),
 	#endif
 	#ifdef Q4B_ENABLE_ZSTD
-	new CompressionSchemeData_Zstd(),
+	new CompressionSchemeInfo_Zstd(),
 	#endif
 	#ifdef Q4B_ENABLE_BROTLI
-	new CompressionSchemeData_Brotli(),
+	new CompressionSchemeInfo_Brotli(),
 	#endif
 	#ifdef Q4B_ENABLE_STB
-	new CompressionSchemeData_Stb(),
+	new CompressionSchemeInfo_Stb(),
 	#endif
 };
 
 // Returns 1 on failure, sets scheme on success
 static int ExtToScheme(const std::string& FILE_EXT, q4b::CompressionScheme* scheme) {
-	for (const CompressionSchemeData* info : SCHEME_DATA) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
 		for (const auto& ext : info->fileExtensions) {
 			if (FILE_EXT == ext) {
 				*scheme = info->scheme;
@@ -44,7 +44,7 @@ static int ExtToScheme(const std::string& FILE_EXT, q4b::CompressionScheme* sche
 
 // Returns 1 on failure, sets scheme on success
 static int StrToScheme(const std::string& SCHEME, q4b::CompressionScheme* scheme) {
-	for (const CompressionSchemeData* info : SCHEME_DATA) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
 		for (const auto& name : info->searchNames) {
 			if (SCHEME == name) {
 				*scheme = info->scheme;
@@ -95,7 +95,7 @@ static int SchemeToFunctions(q4b::CompressionScheme scheme, CompressionSchemeFun
 }
 
 static std::string SchemeToFileExt(q4b::CompressionScheme scheme) {
-	for (const CompressionSchemeData* info : SCHEME_DATA) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
 		if (scheme == info->scheme) {
 			return info->fileExtensions[0];
 		}

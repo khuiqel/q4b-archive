@@ -12,7 +12,7 @@ enum class CompressionSchemeRecommendedLevel : uint8_t {
 	Best,
 };
 
-struct CompressionSchemeData {
+struct CompressionSchemeInfo {
 	// Core info
 	q4b::CompressionScheme scheme;
 	bool isDictionaryScheme;
@@ -33,17 +33,19 @@ struct CompressionSchemeData {
 	std::vector<std::string> fileExtensions; // Has the '.'
 
 	// Rest
-	virtual void Initialize() noexcept = 0; //TODO: Initialize_Gui()?
-	virtual ~CompressionSchemeData() {
+	virtual void Initialize_Gui() = 0;
+	virtual ~CompressionSchemeInfo() {
 		// GUI
-		for (char* str : clevel_str) {
-			delete[] str;
+		if (clevel_str.size() > 0) {
+			for (char* str : clevel_str) {
+				delete[] str;
+			}
 		}
 	}
 };
 
-struct CompressionSchemeData_Uncompressed final : public CompressionSchemeData {
-	CompressionSchemeData_Uncompressed() {
+struct CompressionSchemeInfo_Uncompressed final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Uncompressed() {
 		scheme = q4b::CompressionScheme::Uncompressed;
 		isDictionaryScheme = false;
 		usableForGenericExport = false; // Technically yes, but don't bother officially supporting because why
@@ -56,12 +58,12 @@ struct CompressionSchemeData_Uncompressed final : public CompressionSchemeData {
 		searchNames = { "Uncompressed", "uncompressed", "none", "" };
 		fileExtensions = { ".uncompressed" };
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 
 #ifdef Q4B_ENABLE_LZ4
-struct CompressionSchemeData_Lz4 final : public CompressionSchemeData {
-	CompressionSchemeData_Lz4() {
+struct CompressionSchemeInfo_Lz4 final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Lz4() {
 		scheme = q4b::CompressionScheme::lz4;
 		isDictionaryScheme = false;
 		usableForGenericExport = true;
@@ -75,14 +77,14 @@ struct CompressionSchemeData_Lz4 final : public CompressionSchemeData {
 		searchNames = { "LZ4", "lz4" };
 		fileExtensions = { ".lz4" };
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 #endif
 
 #ifdef Q4B_ENABLE_ZSTD
-struct CompressionSchemeData_Zstd final : public CompressionSchemeData {
+struct CompressionSchemeInfo_Zstd final : public CompressionSchemeInfo {
 	//TODO: store cctx
-	CompressionSchemeData_Zstd() {
+	CompressionSchemeInfo_Zstd() {
 		scheme = q4b::CompressionScheme::zstd;
 		isDictionaryScheme = false;
 		usableForGenericExport = true;
@@ -96,12 +98,12 @@ struct CompressionSchemeData_Zstd final : public CompressionSchemeData {
 		searchNames = { "Zstd", "zstd", "ZSTD", "Zstandard" };
 		fileExtensions = { ".zst" };
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 
 /*
-struct CompressionSchemeData_Zstd_Dict final : public CompressionSchemeData {
-	CompressionSchemeData_Zstd_Dict() {
+struct CompressionSchemeInfo_Zstd_Dict final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Zstd_Dict() {
 		scheme = q4b::CompressionScheme::zstd_dict;
 		isDictionaryScheme = true;
 		usableForGenericExport = true; // TODO
@@ -114,14 +116,14 @@ struct CompressionSchemeData_Zstd_Dict final : public CompressionSchemeData {
 		searchNames = { "Zstd (dictionary)", "zstd_dict", "ZSTD_DICT" };
 		fileExtensions = {}; //TODO
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 */
 #endif
 
 #ifdef Q4B_ENABLE_BROTLI
-struct CompressionSchemeData_Brotli final : public CompressionSchemeData {
-	CompressionSchemeData_Brotli() {
+struct CompressionSchemeInfo_Brotli final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Brotli() {
 		scheme = q4b::CompressionScheme::brotli;
 		isDictionaryScheme = false;
 		usableForGenericExport = false;
@@ -134,13 +136,13 @@ struct CompressionSchemeData_Brotli final : public CompressionSchemeData {
 		searchNames = { "Brotli", "brotli" };
 		fileExtensions = { ".br" };
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 #endif
 
 /*
-struct CompressionSchemeData_Zlib final : public CompressionSchemeData {
-	CompressionSchemeData_Zlib() {
+struct CompressionSchemeInfo_Zlib final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Zlib() {
 		scheme = q4b::CompressionScheme::zlib;
 		isDictionaryScheme = false;
 		usableForGenericExport = false; // TODO
@@ -154,13 +156,13 @@ struct CompressionSchemeData_Zlib final : public CompressionSchemeData {
 		searchNames = { "zlib", "zlib-ng", "miniz" };
 		fileExtensions = {}; //TODO
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 */
 
 #ifdef Q4B_ENABLE_STB
-struct CompressionSchemeData_Stb final : public CompressionSchemeData {
-	CompressionSchemeData_Stb() {
+struct CompressionSchemeInfo_Stb final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Stb() {
 		scheme = q4b::CompressionScheme::stb;
 		isDictionaryScheme = false;
 		usableForGenericExport = false;
@@ -175,6 +177,6 @@ struct CompressionSchemeData_Stb final : public CompressionSchemeData {
 		searchNames = { "stb", "STB", "stb_compress" };
 		fileExtensions = { ".stb" };
 	}
-	void Initialize() noexcept override;
+	void Initialize_Gui() override;
 };
 #endif

@@ -4,7 +4,7 @@
 #include <thread> //hardware_concurrency
 
 int GuiData::threadCountMax = 1;
-std::vector<CompressionSchemeData*> GuiData::compressionSchemes;
+std::vector<CompressionSchemeInfo*> GuiData::compressionSchemes;
 
 void GuiData::Initialize() {
 	if (!compressionSchemes.empty()) {
@@ -12,22 +12,22 @@ void GuiData::Initialize() {
 	}
 
 	compressionSchemes = {
-		new CompressionSchemeData_Uncompressed(),
+		new CompressionSchemeInfo_Uncompressed(),
 		#ifdef Q4B_ENABLE_LZ4
-		new CompressionSchemeData_Lz4(),
+		new CompressionSchemeInfo_Lz4(),
 		#endif
 		#ifdef Q4B_ENABLE_ZSTD
-		new CompressionSchemeData_Zstd(),
+		new CompressionSchemeInfo_Zstd(),
 		#endif
 		#ifdef Q4B_ENABLE_BROTLI
-		new CompressionSchemeData_Brotli(),
+		new CompressionSchemeInfo_Brotli(),
 		#endif
 		#ifdef Q4B_ENABLE_STB
-		new CompressionSchemeData_Stb(),
+		new CompressionSchemeInfo_Stb(),
 		#endif
 	};
 	for (auto c : compressionSchemes) {
-		c->Initialize();
+		c->Initialize_Gui();
 	}
 
 	threadCountMax = std::max(1u, std::thread::hardware_concurrency());
