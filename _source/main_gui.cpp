@@ -18,6 +18,7 @@
 
 #include "q4b_helpers.hpp"
 #include "gui_data.hpp"
+#include "app/imgui_helpers.hpp"
 #include <iostream>
 
 GuiData gdata;
@@ -65,7 +66,7 @@ int main(int argc, char** argv)
     // Create window with SDL_Renderer graphics context
     float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL3+SDL_Renderer example", (int)(1600 * main_scale), (int)(1000 * main_scale), window_flags);
+    SDL_Window* window = SDL_CreateWindow("Q4B Archiver | Version v0.0.0-alpha | CURRENTLY IN DEVELOPMENT, NOT SUITABLE FOR GENERAL USE", (int)(1600 * main_scale), (int)(1000 * main_scale), window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -136,10 +137,25 @@ int main(int argc, char** argv)
 
 	// Root folder for relative paths
 	{
-		std::string root_folder = std::filesystem::current_path().generic_string(); // .generic_string() converts slashes on Windows
+		const std::string root_folder = std::filesystem::current_path().generic_string(); // .generic_string() converts slashes on Windows
 		strncpy(root_file_path, root_folder.c_str(), root_folder.size());
 	}
 	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3 });
+
+	SDL_Texture *recommended_awful = nullptr, *recommended_okay = nullptr, *recommended_good = nullptr, *recommended_best = nullptr, *recommended_noopinion = nullptr;
+	ret = ImGuiHelpers::LoadPNGFromFile("res/cross-mark_274c.png",          renderer, &recommended_awful);
+	ret = ImGuiHelpers::LoadPNGFromFile("res/minus_2796.png",               renderer, &recommended_okay);
+	ret = ImGuiHelpers::LoadPNGFromFile("res/thumbs-up_1f44d.png",          renderer, &recommended_good);
+	ret = ImGuiHelpers::LoadPNGFromFile("res/glowing-star_1f31f.png",       renderer, &recommended_best);
+	ret = ImGuiHelpers::LoadPNGFromFile("res/white-question-mark_2754.png", renderer, &recommended_noopinion);
+
+	const std::unordered_map<CompressionSchemeRecommendedLevel, SDL_Texture*> recommendationStr_toTexId = {
+		{ CompressionSchemeRecommendedLevel::Awful, recommended_awful },
+		{ CompressionSchemeRecommendedLevel::Okay, recommended_okay },
+		{ CompressionSchemeRecommendedLevel::Good, recommended_good },
+		{ CompressionSchemeRecommendedLevel::Best, recommended_best },
+		{ CompressionSchemeRecommendedLevel::No_Opinion, recommended_noopinion },
+	};
 
     // Main loop
     bool done = false;
@@ -257,17 +273,34 @@ int main(int argc, char** argv)
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
 					if (ImGui::BeginCombo("Compression Scheme", GuiData::compressionSchemes[gdata.compressionScheme_idx]->displayName)) {
-						for (int n = 0; n < GuiData::compressionSchemes.size(); n++) {
+						for (int n = 0; n < std::size(GuiData::compressionSchemes); n++) {
 							if (ImGui::Selectable(GuiData::compressionSchemes[n]->displayName, gdata.compressionScheme_idx == n)) {
 								gdata.set_compressionScheme(n);
 							}
 						}
 						ImGui::EndCombo();
 					}
+					const CompressionSchemeInfo* info = GuiData::compressionSchemes[gdata.compressionScheme_idx];
 
 					ImGui::Indent();
 
-					ImGui::Combo("Compression Level", &gdata.compressionLevel_idx, GuiData::compressionSchemes[gdata.compressionScheme_idx]->clevel_str.data(), GuiData::compressionSchemes[gdata.compressionScheme_idx]->clevel_str.size());
+					if (info->clevel_str.size() <= 1) { ImGui::BeginDisabled(); }
+					ImGui::Combo("Compression Level", &gdata.compressionLevel_idx, info->clevel_str.data(), info->clevel_str.size());
+					if (info->clevel_str.size() <= 1) { ImGui::EndDisabled(); }
+
+					ImGui::TextUnformatted("Recommendation:");
+					ImGui::SameLine();
+					ImGui::Image(recommendationStr_toTexId.at(info->recommendation), { ImGui::GetTextLineHeight(), ImGui::GetTextLineHeight() });
+
+					ImGui::TextUnformatted("Information:");
+					ImGui::SameLine();
+					ImGuiHelpers::HelpMarker(info->informationText);
+					ImGui::SameLine();
+					ImGui::TextUnformatted(info->usableForGenericExport ? "  Metadata (frame) support: Yes" : "  Metadata (frame) support: No");
+
+					if (info->isDictionaryScheme) {
+						//TODO
+					}
 
 					ImGui::Unindent();
 
@@ -464,19 +497,9 @@ int main(int argc, char** argv)
 
 					ImGui::NewLine();
 					if (ImGui::TreeNodeEx("Enabled Schemes", ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DefaultOpen)) {
-						ImGui::BulletText("Uncompressed");
-						#ifdef Q4B_ENABLE_LZ4
-						ImGui::BulletText("LZ4");
-						#endif
-						#ifdef Q4B_ENABLE_ZSTD
-						ImGui::BulletText("Zstd");
-						#endif
-						#ifdef Q4B_ENABLE_BROTLI
-						ImGui::BulletText("Brotli");
-						#endif
-						#ifdef Q4B_ENABLE_STB
-						ImGui::BulletText("stb");
-						#endif
+						for (const CompressionSchemeInfo* info : GuiData::compressionSchemes) {
+							ImGui::BulletText(info->displayName);
+						}
 						ImGui::TreePop();
 					}
 

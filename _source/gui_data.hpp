@@ -16,7 +16,7 @@ struct GuiData {
 
 	// Compressing files
 
-	static std::vector<CompressionSchemeInfo*> compressionSchemes;
+	static CompressionSchemeInfo* compressionSchemes[q4b::ENABLED_SCHEMES_COUNT];
 
 	int compressionScheme_idx;
 	int compressionLevel_idx;

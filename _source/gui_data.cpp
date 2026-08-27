@@ -1,17 +1,16 @@
 #include "gui_data.hpp"
-#include <algorithm>
-#include <string>
+#include <algorithm> //std::copy
 #include <thread> //hardware_concurrency
 
 int GuiData::threadCountMax = 1;
-std::vector<CompressionSchemeInfo*> GuiData::compressionSchemes;
+CompressionSchemeInfo* GuiData::compressionSchemes[q4b::ENABLED_SCHEMES_COUNT] = {};
 
 void GuiData::Initialize() {
-	if (!compressionSchemes.empty()) {
+	if (compressionSchemes[0] != nullptr) {
 		return;
 	}
 
-	compressionSchemes = {
+	CompressionSchemeInfo* compressionSchemes_tempArr[] = {
 		new CompressionSchemeInfo_Uncompressed(),
 		#ifdef Q4B_ENABLE_LZ4
 		new CompressionSchemeInfo_Lz4(),
@@ -26,6 +25,9 @@ void GuiData::Initialize() {
 		new CompressionSchemeInfo_Stb(),
 		#endif
 	};
+	static_assert(std::size(compressionSchemes_tempArr) == std::size(compressionSchemes));
+	std::copy(compressionSchemes_tempArr, compressionSchemes_tempArr + q4b::ENABLED_SCHEMES_COUNT, compressionSchemes);
+
 	for (auto c : compressionSchemes) {
 		c->Initialize_Gui();
 	}
@@ -34,8 +36,9 @@ void GuiData::Initialize() {
 }
 
 void GuiData::Uninitialize() {
-	for (auto c : compressionSchemes) {
-		delete c;
+	for (size_t i = 0; i < q4b::ENABLED_SCHEMES_COUNT; i++) {
+		delete compressionSchemes[i];
+		compressionSchemes[i] = nullptr;
 	}
 }
 
