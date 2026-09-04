@@ -225,6 +225,66 @@ template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_interna
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
+void WriteCompressedFiles_internal(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	// Compress files
+	auto compressed_files_data = CompressFiles_internal<extraFeatures, true>(
+		file_list, root_file_path,
+		messages,
+		working_flag, exit_flag, files_completed);
+
+	if (compressed_files_data.size() != file_list.size()) {
+		//TODO
+	}
+
+	if constexpr (extraFeatures)
+		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+			messages->push_back({ ErrorSeverity::info, "Quitting early" });
+			for (auto [header, f] : compressed_files_data) {
+				if (f) delete[] f;
+			}
+			working_flag->store(false);
+			return;
+		}
+
+	// Do not proceed further if there was an error
+	for (const auto& message : *messages) {
+		if (message.severity == ErrorSeverity::error) {
+			for (auto [header, f] : compressed_files_data) {
+				if (f) delete[] f;
+			}
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+	}
+
+	// Write files
+	for (auto [header, f] : compressed_files_data) {
+		const std::filesystem::path output = output_dir / std::filesystem::path(header.path).filename();
+		std::ofstream outfile(output, std::ios::binary);
+		outfile.write((const char*)f, header.compressed_size);
+	}
+
+	// Cleanup
+	for (int i = 0; i < file_list.size(); i++) {
+		// The pointer can only be nullptr if there was an error
+		delete[] compressed_files_data[i].second;
+	}
+	if constexpr (extraFeatures) working_flag->store(false);
+}
+template void WriteCompressedFiles_internal<true>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template void WriteCompressedFiles_internal<false>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
+template <bool extraFeatures>
 void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
                   int threadCount, std::vector<ErrorMessage>* messages,
                   std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {

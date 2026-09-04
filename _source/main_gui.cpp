@@ -456,23 +456,57 @@ int main(int argc, char** argv)
 				}
 
 				if (ImGui::BeginTabItem("Quick Compression")) {
-					if (ImGui::Button("Create q4b-gui.zstd (TODO)")) {
-						//q4b::compressZstdFile(argv[0], std::string(argv[0]) + ".zstd");
-					}
-					if (ImGui::Button("Decompress q4b-gui.zstd (TODO)")) {
-						//q4b::decompressZstdFile(std::string(argv[0]) + ".zstd", std::string(argv[0]) + "-decompressed");
-					}
+					ImGui::SeparatorText("Change");
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
-					//TODO: this needs to do an lz4 frame, not block
-					if (ImGui::Button("Create q4b-gui.lz4 (TODO)")) {
-						//q4b::compressLz4File(argv[0], std::string(argv[0]) + ".lz4");
+					if (ImGui::BeginCombo("Compression Scheme", GuiData::compressionSchemes[gdata.compressionScheme_idx]->displayName)) {
+						for (int n = 0; n < std::size(GuiData::compressionSchemes); n++) {
+							if (ImGui::Selectable(GuiData::compressionSchemes[n]->displayName, gdata.compressionScheme_idx == n)) {
+								gdata.set_compressionScheme(n);
+							}
+						}
+						ImGui::EndCombo();
 					}
-					if (ImGui::Button("Decompress q4b-gui.lz4 (TODO)")) {
-						//q4b::decompressLz4File(std::string(argv[0]) + ".lz4", std::string(argv[0]) + "-decompressed", std::filesystem::file_size(argv[0]));
-					}
+					const CompressionSchemeInfo* info = GuiData::compressionSchemes[gdata.compressionScheme_idx];
+
+					ImGui::Indent();
+					if (info->clevel_str.size() <= 1) { ImGui::BeginDisabled(); }
+					ImGui::Combo("Compression Level", &gdata.compressionLevel_idx, info->clevel_str.data(), info->clevel_str.size());
+					if (info->clevel_str.size() <= 1) { ImGui::EndDisabled(); }
+					ImGui::Unindent();
+
+					ImGui::PopItemWidth();
+
+					ImGui::SeparatorText("Configuration");
+
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+					ImGui::InputText("Output folder", output_file_path, IM_COUNTOF(output_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
+					ImGui::PopItemWidth();
 
 					if (ImGui::Button("Prune Existence")) {
 						q4b::ExistencePrune(FILE_LIST);
+					}
+					if (ImGui::Button("Remove duplicate filename")) {
+						std::vector<std::string> filenames;
+						filenames.reserve(FILE_LIST.size());
+						for (size_t i = 0; i < FILE_LIST.size(); i++) {
+							const std::string f = std::filesystem::path(FILE_LIST[i].getFilepath()).filename().string();
+							if (std::find(filenames.begin(), filenames.end(), f) == filenames.end()) {
+								filenames.push_back(f);
+							} else {
+								FILE_LIST.erase(FILE_LIST.begin() + i);
+								i--;
+							}
+						}
+					}
+
+					ImGui::SeparatorText("Create");
+
+					if (ImGui::Button("Compress Files")) {
+						q4b::WriteCompressedFiles(FILE_LIST, root_file_path, output_file_path, &gdata.messages);
+					}
+					if (ImGui::Button("Decompress Files (TODO)")) {
+						//TODO
 					}
 
 					ImGui::EndTabItem();
