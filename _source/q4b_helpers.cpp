@@ -75,20 +75,11 @@ static CompressionSchemeInfo* SchemeToInfo(CompressionScheme scheme) {
 	return nullptr;
 }
 
-template <bool extraFeatures>
-void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                  int threadCount, std::vector<ErrorMessage>* messages,
-                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
-	// Open file
-	const std::filesystem::path output_tmp = output.string() + ".tmp";
-	std::ofstream outfile(output_tmp, std::ios::binary);
-	if (!outfile) {
-		// TODO: Is std::atomic_thread_fence needed for messages? Or is it fine because because the default memory order (memory_order_seq_cst) on working_flag forces a fence?
-		messages->push_back({ ErrorSeverity::error, "Could not reserve temp file" });
-		if constexpr (extraFeatures) working_flag->store(false);
-		return;
-	}
+template <bool extraFeatures, bool GenericExport>
+std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
 	// Check for valid compression schemes, existence, duplicates
 	{
@@ -101,7 +92,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		}
 		if (!allSchemesValid) {
 			if constexpr (extraFeatures) working_flag->store(false);
-			return;
+			return {};
 		}
 
 		bool allFilesExist = true;
@@ -117,7 +108,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		}
 		if (!allFilesExist) {
 			if constexpr (extraFeatures) working_flag->store(false);
-			return;
+			return {};
 		}
 
 		bool duplicatesExist = false;
@@ -137,81 +128,147 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		}
 		if (duplicatesExist) {
 			if constexpr (extraFeatures) working_flag->store(false);
-			return;
+			return {};
 		}
 	}
 
 	// Compress files
-	std::vector<char*> compressed_files_data(file_list.size());
-	std::vector<ArchivedFileHeader> compressed_files_headers(file_list.size());
-	threadCount = (threadCount > 0) ? (threadCount-1) : 0;
+	std::vector<std::pair<ArchivedFileHeader, void*>> compressed_files_data; compressed_files_data.reserve(file_list.size());
 
 	for (int i = 0; i < file_list.size(); i++) {
 		if constexpr (extraFeatures)
 			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
 				messages->push_back({ ErrorSeverity::info, "Quitting early" });
-				for (int j = 0; j < i; j++) {
-					delete[] compressed_files_data[j];
-				}
 				working_flag->store(false);
-				return;
+				return compressed_files_data;
 			}
 
 		const CompressionFile& file = file_list[i];
-		char* file_data;
+		void* file_data;
 		int64_t file_size = LoadFileIntoMemory(root_file_path / file.data.path, &file_data);
 		if (file_size == -1) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.data.path).string() + "\"" });
-			for (int j = 0; j < i; j++) {
-				delete[] compressed_files_data[j];
-			}
-			if constexpr (extraFeatures) working_flag->store(false);
-			return;
+			compressed_files_data.push_back({ {}, nullptr });
+			continue;
 		}
 
-		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		std::memcpy(file_header.path, file.data.path, Q4B_MAX_PATH);
-		file_header.compression_type = file.data.compression_type;
-		file_header.uncompressed_size = file_size;
-		file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
-
-		CompressionSchemeFunctions* functions = SchemeToFunctions(file.data.compression_type);
 		if (file.data.compression_type == CompressionScheme::Uncompressed) {
-			compressed_files_data[i] = file_data;
-			file_header.compressed_size = file_header.uncompressed_size;
-			file_header.compressed_hash = file_header.uncompressed_hash;
-		} else if (functions == nullptr) {
-			//TODO: this shouldn't happen but it should quit
-			messages->push_back({ ErrorSeverity::error, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
-			file_header.compression_type = CompressionScheme::Uncompressed;
-			compressed_files_data[i] = file_data;
+			ArchivedFileHeader file_header;
+			file_header.setPath(root_file_path / file.data.path);
+			file_header.compression_type = file.data.compression_type;
+			file_header.compressed_size = file_header.uncompressed_size = file_size;
+			if constexpr (!GenericExport)
+				file_header.compressed_hash = file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
+			file_header.flags = 0;
+			compressed_files_data.push_back({ file_header, file_data });
 		} else {
-			CompressionSchemeInfo* info = SchemeToInfo(file.data.compression_type);
-			if (!info->usableForGenericExport) {
+			CompressionSchemeFunctions* functions = SchemeToFunctions(file.data.compression_type);
+			if (functions == nullptr) [[unlikely]] {
+				messages->push_back({ ErrorSeverity::error, "Unknown compression type for file \"" + (root_file_path / file.data.path).string() + "\"" });
+				compressed_files_data.push_back({ {}, nullptr });
+				delete[] file_data;
+			} else {
+				CompressionSchemeInfo* info = SchemeToInfo(file.data.compression_type);
 				//TODO
-				messages->push_back({ ErrorSeverity::warn, std::string(info->displayName) + " doesn't support writing metadata" });
+				if (!info->usableForGenericExport && file.getFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata)) {
+					messages->push_back({ ErrorSeverity::warn, std::string(info->displayName) + " doesn't support writing metadata" });
+				}
+
+				void* outputData;
+				uint64_t compressedSize;
+				if constexpr (GenericExport) {
+					compressedSize = functions->Compress_GenericExport(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_size, &outputData);
+				} else {
+					compressedSize = functions->Compress(              file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_size, &outputData);
+				}
+				//TODO: handle errors
+
+				ArchivedFileHeader file_header;
+				file_header.setPath(root_file_path / file.data.path);
+				file_header.compression_type = file.data.compression_type;
+				file_header.uncompressed_size = file_size;
+				file_header.compressed_size = compressedSize;
+				if constexpr (!GenericExport) {
+					file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
+					file_header.compressed_hash = ComputeHash(outputData, file_header.compressed_size);
+				}
+				file_header.flags = 0;
+				compressed_files_data.push_back({ file_header, outputData });
+
+				delete functions;
+				delete[] file_data;
 			}
-
-			uint64_t compressedSize = functions->Compress(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_header.uncompressed_size, (void**)&(compressed_files_data[i]));
-			file_header.compressed_size = compressedSize;
-			file_header.compressed_hash = ComputeHash(compressed_files_data[i], compressedSize);
-
-			delete functions;
-			delete[] file_data;
 		}
 
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
+	}
+	//TODO: maybe push an info message for each one compressed
+
+	if constexpr (extraFeatures) working_flag->store(false);
+	return compressed_files_data;
+}
+template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, false>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, true>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, false>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, true>(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
+template <bool extraFeatures>
+void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+                  int threadCount, std::vector<ErrorMessage>* messages,
+                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	// Open file
+	const std::filesystem::path output_tmp = output.string() + ".tmp";
+	std::ofstream outfile(output_tmp, std::ios::binary);
+	if (!outfile) {
+		// TODO: Is std::atomic_thread_fence needed for messages? Or is it fine because because the default memory order (memory_order_seq_cst) on working_flag forces a fence?
+		messages->push_back({ ErrorSeverity::error, "Could not reserve temp file" });
+		if constexpr (extraFeatures) working_flag->store(false);
+		return;
+	}
+
+	// Compress files
+	auto compressed_files_data = CompressFiles_internal<extraFeatures, false>(
+		file_list, root_file_path,
+		messages,
+		working_flag, exit_flag, files_completed);
+
+	if (compressed_files_data.size() != file_list.size()) {
+		//TODO
 	}
 
 	if constexpr (extraFeatures)
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::info, "Quitting early" });
-			for (int i = 0; i < file_list.size(); i++) {
-				delete[] compressed_files_data[i];
+			for (auto [header, f] : compressed_files_data) {
+				if (f) delete[] f;
 			}
 			working_flag->store(false);
 			return;
 		}
+
+	// Do not proceed further if there was an error
+	for (const auto& message : *messages) {
+		if (message.severity == ErrorSeverity::error) {
+			for (auto [header, f] : compressed_files_data) {
+				if (f) delete[] f;
+			}
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+	}
 
 	// Write archive
 	ArchiveHeader ah;
@@ -219,12 +276,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	ah.computeHash();
 	outfile.write((const char*)&ah, sizeof(ah));
 
-	for (const ArchivedFileHeader& fh : compressed_files_headers) {
-		outfile.write((const char*)&fh, sizeof(fh));
+	for (auto [header, f] : compressed_files_data) {
+		outfile.write((const char*)&header, sizeof(header));
 	}
-	for (int i = 0; i < file_list.size(); i++) {
-		uint64_t size = compressed_files_headers[i].compressed_size;
-		outfile.write((const char*)(compressed_files_data[i]), size);
+	for (auto [header, f] : compressed_files_data) {
+		outfile.write((const char*)f, header.compressed_size);
 	}
 
 	outfile.close();
@@ -235,8 +291,10 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 		// std::filesystem::remove(output_tmp);
 	}
 
+	// Cleanup
 	for (int i = 0; i < file_list.size(); i++) {
-		delete[] compressed_files_data[i];
+		// The pointer can only be nullptr if there was an error
+		delete[] compressed_files_data[i].second;
 	}
 	if constexpr (extraFeatures) working_flag->store(false);
 }
@@ -263,7 +321,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		return;
 	}
 
-	char* archive;
+	void* archive;
 	int64_t file_size = LoadFileIntoMemory(input, &archive);
 	if (file_size == -1) {
 		//TODO
@@ -285,7 +343,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 	}
 	// if (ah.version <= 0) { return; } //TODO: versioning
 
-	std::vector<char*> compressed_files_data(ah.num_files);
+	std::vector<void*> compressed_files_data(ah.num_files);
 	std::vector<ArchivedFileHeader> compressed_files_headers(ah.num_files);
 	size_t file_offset = sizeof(ArchiveHeader);
 
@@ -297,7 +355,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		}
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		std::memcpy(&file_header, archive + file_offset, sizeof(ArchivedFileHeader));
+		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
 		file_offset += sizeof(ArchivedFileHeader);
 	}
 
@@ -313,7 +371,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		}
 
 		compressed_files_data[i] = new char[compressed_size];
-		std::memcpy(compressed_files_data[i], archive + file_offset, compressed_size);
+		std::memcpy(compressed_files_data[i], (const char*)archive + file_offset, compressed_size);
 		file_offset += compressed_size;
 	}
 	// std::cout << "archive size: " << archive_size << " | file offset: " << file_offset << std::endl;
@@ -322,7 +380,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		auto hash = ComputeHash(compressed_files_data[i], compressed_files_headers[i].compressed_size);
 		if (hash != compressed_files_headers[i].compressed_hash) {
 			delete[] archive;
-			for (char* f : compressed_files_data) {
+			for (void* f : compressed_files_data) {
 				delete[] f;
 			}
 			// std::cout << "size: " << compressed_files_headers[i].compressed_size << " | hash stored: " << compressed_files_headers[i].compressed_hash << " | computed hash: " << hash << std::endl;
@@ -360,7 +418,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 	std::cout << "unpacked .q4b\n";
 
-	for (char* f : compressed_files_data) {
+	for (void* f : compressed_files_data) {
 		delete[] f;
 	}
 	delete[] archive;
@@ -372,7 +430,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 		return false;
 	}
 
-	char* archive;
+	void* archive;
 	int64_t file_size = LoadFileIntoMemory(input, &archive); //TODO: no need to load the entire file...
 	if (file_size == -1) {
 		//TODO
@@ -392,7 +450,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 		}
 
 		ArchivedFileHeader file_header;
-		std::memcpy(&file_header, archive + file_offset, sizeof(ArchivedFileHeader));
+		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
 		list.push_back(file_header);
 		file_offset += sizeof(ArchivedFileHeader);
 	}
@@ -401,7 +459,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 	return true;
 }
 
-int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept {
+int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) noexcept {
 	// Open file (at the end)
 	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
 	if (!file) {

@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
 		const bool BENCHMARK_MODE = subcom_compress->get_option_no_throw("--bench")->as<bool>();
 
 		// if (std::filesystem::exists(INPUT) && std::filesystem::is_directory(OUTPUT_DIR)) {
-		char* file_data;
+		void* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
 			std::cerr << "ERROR: file not found\n";
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
 		                               "." : subcom_decompress->get_option_no_throw("-o")->as<std::string>();
 		const bool BENCHMARK_MODE = subcom_decompress->get_option_no_throw("--bench")->as<bool>();
 
-		char* file_data;
+		void* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
 			std::cerr << "ERROR: file not found\n";

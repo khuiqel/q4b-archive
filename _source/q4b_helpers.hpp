@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <unordered_map>
+#include <utility> // std::pair
 #include <vector>
 
 namespace q4b {
@@ -37,17 +38,29 @@ CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme);
  */
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
 
+/* Internal function for writing archives and quick compression. Won't begin on certain failures
+ * (like invalid scheme or duplicates). Will continue if the compression encounters an error.
+ * TODO: another tparam for quitting early on error?
+ *
+ * @tparam GenericExport Does the generic export version of compress. Will not calculate the ArchivedFileHeader hashes.
+ *
+ * @return A list of the files compressed, allocated using `new[]`, nullptr on failure.
+ */
+template <bool extraFeatures, bool GenericExport>
+std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
 template <bool extraFeatures>
 void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
                            int threadCount, std::vector<ErrorMessage>* messages,
                            std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
-
-
 /* Writes the Q4B archive.
  *
  * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
- * @param root_file_path [in] The root which file_list is relative to.
+ * @param root_file_path [in] The root which `file_list` is relative to.
  * @param output [in] Output name of the archive.
  * @param threadCount [in] Number of threads to use, counting the starter thread.
  * @param messages [out,optional] Accumulated error messages. (TODO)
@@ -67,7 +80,7 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
 /* Writes the Q4B archive.
  *
  * @param file_list [in] List of files to process. Does NOT allow duplicate filepaths.
- * @param root_file_path [in] The root which file_list is relative to.
+ * @param root_file_path [in] The root which `file_list` is relative to.
  * @param output [in] Output name of the archive.
  * @param threadCount [in] Number of threads to use, counting the starter thread.
  * @param messages [out,optional] Accumulated error messages. (TODO)
@@ -105,6 +118,6 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  *
  * @return Size of the file. -1 if error. If the full file couldn't be loaded, returns -1.
  */
-[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept;
+[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) noexcept;
 
 } // namespace q4b
