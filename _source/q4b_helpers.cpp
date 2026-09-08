@@ -152,14 +152,16 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 			continue;
 		}
 
+		ArchivedFileHeader file_header;
+		std::memcpy(file_header.path, file.data.path, Q4B_MAX_PATH);
+		file_header.compression_type = file.data.compression_type;
+		file_header.uncompressed_size = file_size;
+		file_header.flags = 0;
+
 		if (file.data.compression_type == CompressionScheme::Uncompressed) {
-			ArchivedFileHeader file_header;
-			file_header.setPath(root_file_path / file.data.path);
-			file_header.compression_type = file.data.compression_type;
-			file_header.compressed_size = file_header.uncompressed_size = file_size;
+			file_header.compressed_size = file_header.uncompressed_size;
 			if constexpr (!GenericExport)
 				file_header.compressed_hash = file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
-			file_header.flags = 0;
 			compressed_files_data.push_back({ file_header, file_data });
 		} else {
 			CompressionSchemeFunctions* functions = SchemeToFunctions(file.data.compression_type);
@@ -183,16 +185,11 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 				}
 				//TODO: handle errors
 
-				ArchivedFileHeader file_header;
-				file_header.setPath(root_file_path / file.data.path);
-				file_header.compression_type = file.data.compression_type;
-				file_header.uncompressed_size = file_size;
 				file_header.compressed_size = compressedSize;
 				if constexpr (!GenericExport) {
 					file_header.uncompressed_hash = ComputeHash(file_data, file_header.uncompressed_size);
 					file_header.compressed_hash = ComputeHash(outputData, file_header.compressed_size);
 				}
-				file_header.flags = 0;
 				compressed_files_data.push_back({ file_header, outputData });
 
 				delete functions;
