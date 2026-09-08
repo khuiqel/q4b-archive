@@ -419,34 +419,42 @@ int main(int argc, char** argv)
 						if (ImGui::Button("Stop Viewing")) {
 							gdata.viewingArchive = false;
 						}
-						const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-						if (ImGui::BeginTable("table1", 4, table_flags)) {
+						ImGui::NewLine();
+
+						ImGui::TextUnformatted("Magic:"); ImGui::SameLine();
+						ImGui::TextUnformatted(gdata.viewingArchiveHeader.magic);
+						ImGui::TextUnformatted("Flags:"); ImGui::SameLine();
+						ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.flags).c_str());
+						ImGui::TextUnformatted("Archive Version:"); ImGui::SameLine();
+						ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.version).c_str());
+						ImGui::TextUnformatted("Number of files:"); ImGui::SameLine();
+						ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
+
+						const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+						if (ImGui::BeginTable("table1", 4, table_flags, { 0.0f, 16 * ImGui::GetTextLineHeightWithSpacing() })) {
+							ImGui::TableSetupScrollFreeze(0, 1);
 							ImGui::TableSetupColumn("File");
 							ImGui::TableSetupColumn("Scheme");
 							ImGui::TableSetupColumn("Compressed Size");
 							ImGui::TableSetupColumn("Uncompressed Size");
 							ImGui::TableHeadersRow();
 
-							ImGui::TableNextRow();
-							ImGui::TableSetColumnIndex(0);
-							ImGui::TextUnformatted(gdata.viewingArchiveHeader.magic);
-							ImGui::TableNextColumn();
-							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.flags).c_str());
-							ImGui::TableNextColumn();
-							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.version).c_str());
-							ImGui::TableNextColumn();
-							ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
-
-							for (const q4b::ArchivedFileHeader& file_header : gdata.viewingArchiveFileList) {
-								ImGui::TableNextRow();
-								ImGui::TableSetColumnIndex(0);
-								ImGui::TextUnformatted(file_header.path);
-								ImGui::TableNextColumn();
-								ImGui::TextUnformatted(q4b::CompressionToStr(file_header.compression_type));
-								ImGui::TableNextColumn();
-								ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
-								ImGui::TableNextColumn();
-								ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
+							// Copied from IMGUI_DEMO_MARKER("Tables/Vertical scrolling, with clipping")
+							ImGuiListClipper clipper;
+							clipper.Begin(gdata.viewingArchiveFileList.size());
+							while (clipper.Step()) {
+								for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
+									const q4b::ArchivedFileHeader& file_header = gdata.viewingArchiveFileList[row];
+									ImGui::TableNextRow();
+									ImGui::TableSetColumnIndex(0);
+									ImGui::TextUnformatted(file_header.path);
+									ImGui::TableNextColumn();
+									ImGui::TextUnformatted(q4b::CompressionToStr(file_header.compression_type));
+									ImGui::TableNextColumn();
+									ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
+									ImGui::TableNextColumn();
+									ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
+								}
 							}
 							ImGui::EndTable();
 						}
