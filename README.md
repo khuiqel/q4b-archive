@@ -30,6 +30,7 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier. The tests do require C++23 (or honestly C++20).
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
 	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, and GoogleTest for the tests.
+	* **If you want to use stb_compress with MinGW, run this:** `git apply Externals/_patches/0001-stb-fix-defines.patch`
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
 
