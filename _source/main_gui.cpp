@@ -141,6 +141,7 @@ int main(int argc, char** argv)
 		strncpy(root_file_path, root_folder.c_str(), root_folder.size());
 	}
 	FILE_LIST.push_back({ argv[0], q4b::CompressionScheme::zstd, 3 });
+	FILE_LIST[0].data.uncompressed_size = std::filesystem::file_size(argv[0]);
 
 	SDL_Texture *recommended_awful = nullptr, *recommended_okay = nullptr, *recommended_good = nullptr, *recommended_best = nullptr, *recommended_noopinion = nullptr;
 	ret = ImGuiHelpers::LoadPNGFromFile("res/cross-mark_274c.png",          renderer, &recommended_awful);
@@ -185,6 +186,7 @@ int main(int argc, char** argv)
 					if (rootDirIsLocked) {
 						std::filesystem::path path(event.drop.data);
 						FILE_LIST.push_back({ path.lexically_relative(root_file_path).generic_string(), gdata.get_compression_type(), gdata.get_compression_level() });
+						FILE_LIST[FILE_LIST.size()-1].data.uncompressed_size = std::filesystem::file_size(path);
 					}
 					break;
 			}
@@ -214,17 +216,18 @@ int main(int argc, char** argv)
 			if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 			ImGui::TextUnformatted("Drop files here");
 
-			const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+			const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
 			static ImGui_ExampleSelectionWithDeletion selection;
 			selection.UserData = (void*)&FILE_LIST;
 			selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
 
 			const int ITEMS_COUNT = FILE_LIST.size();
 			ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
-			if (ImGui::BeginTable("Selection", 3, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
-				ImGui::TableSetupColumn("File");
+			if (ImGui::BeginTable("Selection", 4, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
+				ImGui::TableSetupColumn("File", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Scheme");
 				ImGui::TableSetupColumn("Level");
+				ImGui::TableSetupColumn("Size");
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
 
@@ -251,6 +254,9 @@ int main(int argc, char** argv)
 
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
+
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.uncompressed_size).c_str());
 
 					ImGui::PopID();
 				}
