@@ -240,7 +240,7 @@ void WriteCompressedFiles_internal(
 	if constexpr (extraFeatures)
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::info, "Quitting early" });
-			for (auto [header, f] : compressed_files_data) {
+			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
 			working_flag->store(false);
@@ -250,7 +250,7 @@ void WriteCompressedFiles_internal(
 	// Do not proceed further if there was an error
 	for (const auto& message : *messages) {
 		if (message.severity == ErrorSeverity::error) {
-			for (auto [header, f] : compressed_files_data) {
+			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
 			if constexpr (extraFeatures) working_flag->store(false);
@@ -259,8 +259,9 @@ void WriteCompressedFiles_internal(
 	}
 
 	// Write files
-	for (auto [header, f] : compressed_files_data) {
-		const std::filesystem::path output = output_dir / std::filesystem::path(header.path).filename();
+	for (auto& [header, f] : compressed_files_data) {
+		CompressionSchemeInfo* info = SchemeToInfo(header.compression_type);
+		const std::string output = (output_dir / std::filesystem::path(header.path).filename()).string() + info->fileExtensions[0];
 		std::ofstream outfile(output, std::ios::binary);
 		outfile.write((const char*)f, header.compressed_size);
 	}
@@ -309,7 +310,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	if constexpr (extraFeatures)
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::info, "Quitting early" });
-			for (auto [header, f] : compressed_files_data) {
+			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
 			working_flag->store(false);
@@ -319,7 +320,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	// Do not proceed further if there was an error
 	for (const auto& message : *messages) {
 		if (message.severity == ErrorSeverity::error) {
-			for (auto [header, f] : compressed_files_data) {
+			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
 			if constexpr (extraFeatures) working_flag->store(false);
@@ -333,10 +334,10 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	ah.computeHash();
 	outfile.write((const char*)&ah, sizeof(ah));
 
-	for (auto [header, f] : compressed_files_data) {
+	for (auto& [header, f] : compressed_files_data) {
 		outfile.write((const char*)&header, sizeof(header));
 	}
-	for (auto [header, f] : compressed_files_data) {
+	for (auto& [header, f] : compressed_files_data) {
 		outfile.write((const char*)f, header.compressed_size);
 	}
 

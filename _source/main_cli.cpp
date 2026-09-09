@@ -85,27 +85,18 @@ static void ReadArchiveInputFile(const std::filesystem::path& input, std::vector
 
 int main(int argc, char** argv) {
 
-	const std::string DESCRIPTION_STR = "Enabled schemes: Uncompressed"
-	#ifdef Q4B_ENABLE_LZ4
-	", LZ4"
-	#endif
-	#ifdef Q4B_ENABLE_ZSTD
-	", Zstd"
-	#endif
-	#ifdef Q4B_ENABLE_BROTLI
-	", Brotli"
-	#endif
-	#ifdef Q4B_ENABLE_STB
-	", stb"
-	#endif
-	;
+	std::string DESCRIPTION_STR = "Enabled schemes: Uncompressed";
+	for (int i = 1; i < std::size(SCHEME_INFO); i++) {
+		DESCRIPTION_STR += ", ";
+		DESCRIPTION_STR += SCHEME_INFO[i]->displayName;
+	}
 
 	CLI::App app(DESCRIPTION_STR);
 	// app.set_help_flag();
 	// app.set_help_all_flag("-h,--help", "Print this help message and exit");
 	CLI::App* subcom_archive    = app.add_subcommand("archive",    "Create Q4B Archives");
 	CLI::App* subcom_unpack     = app.add_subcommand("unpack",     "Unpack Q4B Archives");
-	// CLI::App* subcom_patch      = app.add_subcommand("patch",      "Patch (partial overwrite) Q4B Archives");
+	// CLI::App* subcom_patch      = app.add_subcommand("patch",      "Patch Q4B Archives (partial overwrite)");
 	CLI::App* subcom_inspect    = app.add_subcommand("inspect",    "Inspect Q4B Archives");
 	CLI::App* subcom_compress   = app.add_subcommand("compress",   "Single file compression");
 	CLI::App* subcom_decompress = app.add_subcommand("decompress", "Single file decompression");

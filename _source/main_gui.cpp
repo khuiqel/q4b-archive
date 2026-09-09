@@ -19,6 +19,7 @@
 #include "q4b_helpers.hpp"
 #include "gui_data.hpp"
 #include "app/imgui_helpers.hpp"
+#include <algorithm>
 #include <iostream>
 
 GuiData gdata;
