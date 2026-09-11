@@ -1,0 +1,22 @@
+diff --git a/Externals/snappy/CMakeLists.txt b/Externals/snappy/CMakeLists.txt
+index cd71a47..882ad9a 100644
+--- a/Externals/snappy/CMakeLists.txt
++++ b/Externals/snappy/CMakeLists.txt	
+@@ -173,6 +173,8 @@ int main() {
+   return zero();
+ }" HAVE_ATTRIBUTE_ALWAYS_INLINE)
+ 
++if(NOT MSVC)
++
+ check_cxx_source_compiles("
+ #include <tmmintrin.h>
+ 
+@@ -216,6 +218,8 @@ int main() {
+   return 0;
+ }" SNAPPY_HAVE_NEON)
+ 
++endif(NOT MSVC)
++
+ include(CheckSymbolExists)
+ check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
+ check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)

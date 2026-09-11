@@ -30,6 +30,11 @@ CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme) {
 			return new CompressionSchemeFunctions_Brotli();
 		#endif
 
+		#ifdef Q4B_ENABLE_SNAPPY
+		case q4b::CompressionScheme::snappy:
+			return new CompressionSchemeFunctions_Snappy();
+		#endif
+
 		#ifdef Q4B_ENABLE_STB
 		case q4b::CompressionScheme::stb:
 			return new CompressionSchemeFunctions_Stb();
@@ -58,6 +63,9 @@ CompressionSchemeInfo* SCHEME_INFO[] = {
 	#endif
 	#ifdef Q4B_ENABLE_BROTLI
 	new CompressionSchemeInfo_Brotli(),
+	#endif
+	#ifdef Q4B_ENABLE_SNAPPY
+	new CompressionSchemeInfo_Snappy(),
 	#endif
 	#ifdef Q4B_ENABLE_STB
 	new CompressionSchemeInfo_Stb(),

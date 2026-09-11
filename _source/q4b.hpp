@@ -34,6 +34,7 @@ enum class CompressionScheme : uint32_t {
 
 	CountExtraStart = 1000, // Schemes after this are not used by P3A
 	brotli,
+	snappy,
 	lzma,
 	bzip2,
 	zlib, //implemented using miniz
@@ -53,6 +54,9 @@ constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
 	#endif
 	#ifdef Q4B_ENABLE_BROTLI
 	CompressionScheme::brotli,
+	#endif
+	#ifdef Q4B_ENABLE_SNAPPY
+	CompressionScheme::snappy,
 	#endif
 	#ifdef Q4B_ENABLE_STB
 	CompressionScheme::stb,
@@ -78,6 +82,7 @@ inline const char* CompressionToStr(CompressionScheme c) {
 		// case CompressionScheme::zstd_dict:    return "Zstd_dict";
 
 		case CompressionScheme::brotli:       return "Brotli";
+		case CompressionScheme::snappy:       return "Snappy";
 		// case CompressionScheme::lzma:         return "LZMA";
 		// case CompressionScheme::bzip2:        return "bzip2";
 		// case CompressionScheme::zlib:         return "zlib";

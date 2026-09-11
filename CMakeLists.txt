@@ -5,8 +5,9 @@ set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
 
 # Note: when changing these defaults, you have to delete CMakeCache.txt
 option(Q4B_ENABLE_LZ4    "Enable LZ4 compression and decompression" ON)
-option(Q4B_ENABLE_ZSTD   "Enable Zstd compression and decompression" ON)
+option(Q4B_ENABLE_ZSTD   "Enable Zstandard compression and decompression" ON)
 option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
+option(Q4B_ENABLE_SNAPPY "Enable Snappy compression and decompression" ON)
 option(Q4B_ENABLE_STB    "Enable stb_compress compression and decompression" ON)
 set(Q4B_SCHEME_LIBS)
 option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF)
@@ -38,6 +39,14 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(COMPILER_MARCH_FLAGS "/arch:SSE4.2")
 	# ARM: /arch:armv8.1 (8.0 is the default)
+	if(Q4B_ENABLE_SNAPPY)
+		# Snappy doesn't detect instruction set correctly (MSVC's problem). Remove these if you use x86-64 baseline:
+		set(SNAPPY_HAVE_SSSE3 1)
+		set(SNAPPY_HAVE_X86_CRC32 1)
+		# Add this if you use /arch:AVX2 (x86-64-v3):
+		#set(SNAPPY_HAVE_BMI2 1)
+		# ARM: can probably unconditionally enable SNAPPY_HAVE_NEON_CRC32 and SNAPPY_HAVE_NEON
+	endif()
 else()
 	set(COMPILER_MARCH_FLAGS "-march=x86-64-v2")
 	# ARM: -march=armv8.1-a
@@ -102,6 +111,19 @@ if(Q4B_ENABLE_BROTLI)
 	add_compile_definitions(Q4B_ENABLE_BROTLI)
 endif()
 
+if(Q4B_ENABLE_SNAPPY)
+	set(SNAPPY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(SNAPPY_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+	set(SNAPPY_FUZZING_BUILD OFF CACHE BOOL "" FORCE) # Disabled by default
+	set(SNAPPY_REQUIRE_AVX  OFF CACHE BOOL "" FORCE) # Disabled by default, merely sets compiler arch flags
+	set(SNAPPY_REQUIRE_AVX2 OFF CACHE BOOL "" FORCE) # Same
+	set(SNAPPY_INSTALL OFF CACHE BOOL "" FORCE)
+
+	add_subdirectory(Externals/snappy EXCLUDE_FROM_ALL)
+	list(APPEND Q4B_SCHEME_LIBS snappy)
+	add_compile_definitions(Q4B_ENABLE_SNAPPY)
+endif()
+
 if(Q4B_ENABLE_STB)
 	include_directories(PRIVATE Externals/stb)
 	add_compile_definitions(Q4B_ENABLE_STB)
@@ -113,6 +135,7 @@ find_package(SDL3 3.4.0 REQUIRED COMPONENTS video render OPTIONAL_COMPONENTS gpu
 find_package(lz4 1.8.0 REQUIRED)
 find_package(zstd 1.5.0 REQUIRED)
 find_package(brotli 1.1.0 REQUIRED)
+find_package(snappy 1.2.1 REQUIRED)
 #]]
 
 add_executable(${PROJECT_NAME}

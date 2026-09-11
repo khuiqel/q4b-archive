@@ -312,6 +312,24 @@ TEST(WriteArchive, OneFileCompressedBrotli) {
 }
 #endif
 
+#ifdef Q4B_ENABLE_SNAPPY
+TEST(WriteArchive, OneFileCompressedSnappy) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH);
+	}
+
+	std::vector<q4b::ErrorMessage> messages;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::snappy, 1 } };
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+	// Assume Snappy can compress the test file to less than its original size
+	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+}
+#endif
+
 #ifdef Q4B_ENABLE_STB
 TEST(WriteArchive, OneFileCompressedStb) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {

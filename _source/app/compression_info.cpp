@@ -90,6 +90,34 @@ void CompressionSchemeInfo_Brotli::Initialize_Gui() {
 }
 #endif
 
+#ifdef Q4B_ENABLE_SNAPPY
+#include <snappy.h>
+void CompressionSchemeInfo_Snappy::Initialize_Gui() {
+	constexpr int SnappyMinLevel = snappy::CompressionOptions::MinCompressionLevel();
+	constexpr int SnappyMaxLevel = snappy::CompressionOptions::MaxCompressionLevel();
+	constexpr int SnappyDefaultLevel = snappy::CompressionOptions::DefaultCompressionLevel();
+
+	clevel_str.reserve((SnappyMaxLevel - SnappyMinLevel) + 1);
+	clevel_val.reserve((SnappyMaxLevel - SnappyMinLevel) + 1);
+
+	for (int i = SnappyMinLevel; i <= SnappyMaxLevel; i++) {
+		std::string level = std::to_string(i);
+		if (i == SnappyDefaultLevel) {
+			level += " (default)";
+			clevel_default_idx = clevel_val.size();
+		}
+		if (i == 2) {
+			level += " (experimental)";
+		}
+		char* level_str = new char[level.size()+1];
+		std::copy(level.begin(), level.end(), level_str);
+		level_str[level.size()] = '\0';
+		clevel_str.push_back(level_str);
+		clevel_val.push_back(i);
+	}
+}
+#endif
+
 #ifdef Q4B_ENABLE_STB
 void CompressionSchemeInfo_Stb::Initialize_Gui() {
 	char* str = new char[2];

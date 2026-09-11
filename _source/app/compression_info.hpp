@@ -130,11 +130,31 @@ struct CompressionSchemeInfo_Brotli final : public CompressionSchemeInfo {
 
 		recommendation = CompressionSchemeRecommendedLevel::Good;
 		displayName = "Brotli";
-		informationText = "A bit faster than single-threaded Zstd while having a bit worse compression ratio. Successor to gzip. Designed for font files and HTML text.";
+		informationText = "A bit faster than single-threaded Zstd while having a bit worse compression ratio. Successor to gzip (and Zopfli?). Designed for font files and HTML text.";
 
 		helpText = "clevels: 0-11";
 		searchNames = { "Brotli", "brotli" };
 		fileExtensions = { ".br" };
+	}
+	void Initialize_Gui() override;
+};
+#endif
+
+#ifdef Q4B_ENABLE_SNAPPY
+struct CompressionSchemeInfo_Snappy final : public CompressionSchemeInfo {
+	CompressionSchemeInfo_Snappy() {
+		scheme = q4b::CompressionScheme::snappy;
+		isDictionaryScheme = false;
+		usableForGenericExport = true; // Snappy does have a frame format, but doesn't implement it. Fortunately streams start with the uncompressed length
+
+		recommendation = CompressionSchemeRecommendedLevel::Okay;
+		displayName = "Snappy";
+		informationText = "Focuses on simplicity while being fast. About equal to LZ4 level 1 for compression speed and ratio.\n"
+		                  "Used by Google and has compressed many petabytes. Really its main selling point is simplicity.";
+
+		helpText = "clevels: 1-2"; // 2 is experimental, 3-9 not supported
+		searchNames = { "Snappy", "snappy", "Zippy", "zippy" };
+		fileExtensions = { ".sz" };
 	}
 	void Initialize_Gui() override;
 };

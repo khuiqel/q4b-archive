@@ -17,8 +17,9 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 ## Supported compression schemes
 
 * [LZ4](https://github.com/lz4/lz4)
-* [Zstd](https://github.com/facebook/zstd)
+* [Zstandard](https://github.com/facebook/zstd)
 * [Brotli](https://github.com/google/brotli)
+* [Snappy](https://github.com/google/snappy)
 * [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h)
 
 ## Building
@@ -31,6 +32,7 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
 	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, and GoogleTest for the tests.
 	* **If you want to use stb_compress with MinGW, run this:** `git apply Externals/_patches/0001-stb-fix-defines.patch`
+	* **If you want to use Snappy with Visual Studio, run this:** `git apply Externals/_patches/0002-snappy-msvc-march.patch`
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
 
@@ -132,8 +134,9 @@ GNU General Public License v3.0
 * [GoogleTest](https://github.com/google/googletest): BSD-3-Clause
 * [xxHash](https://github.com/Cyan4973/xxHash): BSD-2-Clause
 * [LZ4](https://github.com/lz4/lz4): BSD-2-Clause and GPLv2+
-* [Zstd](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
+* [Zstandard](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [Brotli](https://github.com/google/brotli): MIT
+* [Snappy](https://github.com/google/snappy): BSD-3-Clause
 * [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h): MIT or The Unlicense
 * [Noto Sans](https://notofonts.github.io/): [SIL OFL 1.1](https://openfontlicense.org/open-font-license-official-text/)
 

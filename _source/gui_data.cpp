@@ -21,6 +21,9 @@ void GuiData::Initialize() {
 		#ifdef Q4B_ENABLE_BROTLI
 		new CompressionSchemeInfo_Brotli(),
 		#endif
+		#ifdef Q4B_ENABLE_SNAPPY
+		new CompressionSchemeInfo_Snappy(),
+		#endif
 		#ifdef Q4B_ENABLE_STB
 		new CompressionSchemeInfo_Stb(),
 		#endif

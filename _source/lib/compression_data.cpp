@@ -223,6 +223,45 @@ CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
 }
 #endif
 
+#ifdef Q4B_ENABLE_SNAPPY
+#include <snappy.h>
+
+uint64_t CompressionSchemeFunctions_Snappy::GetMaxSize() const {
+	return UINT32_MAX;
+}
+
+uint64_t CompressionSchemeFunctions_Snappy::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	*outputData = new char[snappy::MaxCompressedLength(uncompressedSize)];
+	size_t compressedSize;
+	// No option for disabling the uncompressed size being stored, or really any other options
+	snappy::RawCompress((const char*)inputData, uncompressedSize, (char*)(*outputData), &compressedSize, snappy::CompressionOptions(clevel));
+	return compressedSize;
+}
+
+uint64_t CompressionSchemeFunctions_Snappy::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const void* inputData, uint64_t uncompressedSize, void** outputData) const noexcept {
+	// Snappy hasn't implemented its frame format (described in framing_format.txt)
+	return Compress(clevel, flags, inputData, uncompressedSize, outputData);
+}
+
+uint64_t CompressionSchemeFunctions_Snappy::Decompress(const void* inputData, uint64_t compressedSize, void** outputData, uint64_t originalSize) const noexcept {
+	*outputData = new char[originalSize];
+	bool ret = snappy::RawUncompress((const char*)inputData, compressedSize, (char*)(*outputData));
+	return originalSize;
+}
+
+uint64_t CompressionSchemeFunctions_Snappy::Decompress_UnknownSize(const void* inputData, uint64_t compressedSize, void** outputData) const noexcept {
+	size_t decompressedSize;
+	bool ret = snappy::GetUncompressedLength((const char*)inputData, compressedSize, &decompressedSize);
+	*outputData = new char[decompressedSize];
+	ret = snappy::RawUncompress((const char*)inputData, compressedSize, (char*)(*outputData));
+	return decompressedSize;
+}
+
+CompressionSchemeFunctions_Snappy::~CompressionSchemeFunctions_Snappy() {
+	//TODO?
+}
+#endif
+
 #ifdef Q4B_ENABLE_STB
 #define STB_DEFINE
 #include <deprecated/stb.h>
