@@ -10,12 +10,15 @@ option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
 option(Q4B_ENABLE_SNAPPY "Enable Snappy compression and decompression" ON)
 option(Q4B_ENABLE_STB    "Enable stb_compress compression and decompression" ON)
 set(Q4B_SCHEME_LIBS)
+option(Q4B_BUILD_TESTS    "Build tests" ON)
+option(Q4B_DISABLE_GUI    "Disables building the GUI" OFF)
 option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF)
 
 set(CMAKE_CXX_STANDARD 23) # C++23 requires CMake 3.20
 set(CMAKE_CXX_STANDARD_REQUIRED False)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+set(CMAKE_C_STANDARD 17) # Not really needed but helps ensure builds are more consistent
 
 if(NOT CMAKE_BUILD_TYPE)
 	#options: Debug, Release, RelWithDebInfo, MinSizeRel
@@ -27,6 +30,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	# TODO
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+	# Note: specifying --parallel on the command line is probably better practice,
+	# but then Visual Studio wouldn't get the /MP flag
 	add_compile_options(/MP)
 else()
 	message(WARNING "Unknown compiler, assuming it's fine...")
@@ -35,18 +40,28 @@ endif()
 # Global CMake configuration
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-# Enable SSE4.2
+# Set instruction level
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(COMPILER_MARCH_FLAGS "/arch:SSE4.2")
 	# ARM: /arch:armv8.1 (8.0 is the default)
 	if(Q4B_ENABLE_SNAPPY)
-		# Snappy doesn't detect instruction set correctly (MSVC's problem). Remove these if you use x86-64 baseline:
-		set(SNAPPY_HAVE_SSSE3 1)
-		set(SNAPPY_HAVE_X86_CRC32 1)
-		# Add this if you use /arch:AVX2 (x86-64-v3):
-		#set(SNAPPY_HAVE_BMI2 1)
-		# ARM: can probably unconditionally enable SNAPPY_HAVE_NEON_CRC32 and SNAPPY_HAVE_NEON
+		# Snappy doesn't detect instruction set correctly (MSVC's problem). Disable these if you use x86-64 baseline:
+		# (Since the variables already exist, CMake won't bother with check_cxx_source_compiles()... CMake is a strange language)
+		set(SNAPPY_HAVE_SSSE3 ON CACHE BOOL "" FORCE)
+		set(SNAPPY_HAVE_X86_CRC32 ON CACHE BOOL "" FORCE)
+		# Enable this if you use /arch:AVX2 (x86-64-v3):
+		set(SNAPPY_HAVE_BMI2 OFF CACHE BOOL "" FORCE)
+		# ARM: These can probably be unconditionally enabled:
+		set(SNAPPY_HAVE_NEON_CRC32 OFF CACHE BOOL "" FORCE)
+		set(SNAPPY_HAVE_NEON OFF CACHE BOOL "" FORCE)
 	endif()
+	# More macros since MSVC doesn't define them:
+	add_compile_definitions(__SSE__=1)
+	add_compile_definitions(__SSE2__=1)
+	add_compile_definitions(__SSE3__=1)
+	add_compile_definitions(__SSSE3__=1)
+	add_compile_definitions(__SSE4_1__=1)
+	add_compile_definitions(__SSE4_2__=1)
 else()
 	set(COMPILER_MARCH_FLAGS "-march=x86-64-v2")
 	# ARM: -march=armv8.1-a
@@ -55,33 +70,45 @@ endif()
 set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} ${COMPILER_MARCH_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMPILER_MARCH_FLAGS}")
 
-# SDL configuration
-set(SDL_AUDIO    OFF CACHE BOOL "" FORCE)
-set(SDL_VIDEO    ON  CACHE BOOL "" FORCE)
-set(SDL_GPU      OFF CACHE BOOL "" FORCE) # Needed by ImGui (for GPU-accelerated backends)
-set(SDL_RENDER   ON  CACHE BOOL "" FORCE)
-set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
-set(SDL_JOYSTICK OFF CACHE BOOL "" FORCE) # Needed by ImGui if enabling gamepad navigation
-set(SDL_HAPTIC   OFF CACHE BOOL "" FORCE)
-set(SDL_HIDAPI   OFF CACHE BOOL "" FORCE)
-set(SDL_POWER    OFF CACHE BOOL "" FORCE)
-set(SDL_SENSOR   OFF CACHE BOOL "" FORCE)
-set(SDL_DIALOG   OFF CACHE BOOL "" FORCE) # Could be useful
-set(SDL_TRAY     OFF CACHE BOOL "" FORCE) # Could be useful
-# more
-set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-set(SDL_STATIC ON CACHE BOOL "" FORCE)
-set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-set(SDL_TESTS OFF CACHE BOOL "" FORCE)
-set(SDL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
-set(SDL_DISABLE_INSTALL_DOCS ON CACHE BOOL "" FORCE)
-set(SDL_INSTALL_TESTS OFF CACHE BOOL "" FORCE)
-set(SDL_UNIX_CONSOLE_BUILD OFF CACHE BOOL "" FORCE)
+if(NOT Q4B_DISABLE_GUI)
+	set(SDL_AUDIO    OFF CACHE BOOL "" FORCE)
+	set(SDL_VIDEO    ON  CACHE BOOL "" FORCE)
+	set(SDL_GPU      OFF CACHE BOOL "" FORCE) # Needed by ImGui (for GPU-accelerated backends)
+	set(SDL_RENDER   ON  CACHE BOOL "" FORCE)
+	set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
+	set(SDL_JOYSTICK OFF CACHE BOOL "" FORCE) # Needed by ImGui if enabling gamepad navigation
+	set(SDL_HAPTIC   OFF CACHE BOOL "" FORCE)
+	set(SDL_HIDAPI   OFF CACHE BOOL "" FORCE)
+	set(SDL_POWER    OFF CACHE BOOL "" FORCE)
+	set(SDL_SENSOR   OFF CACHE BOOL "" FORCE)
+	set(SDL_DIALOG   OFF CACHE BOOL "" FORCE) # Could be useful
+	set(SDL_TRAY     OFF CACHE BOOL "" FORCE) # Could be useful
 
-add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
+	set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+	set(SDL_STATIC ON CACHE BOOL "" FORCE)
+	set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+	set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+	set(SDL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+	set(SDL_DISABLE_INSTALL_DOCS ON CACHE BOOL "" FORCE)
+	set(SDL_INSTALL_TESTS OFF CACHE BOOL "" FORCE)
+	set(SDL_UNIX_CONSOLE_BUILD OFF CACHE BOOL "" FORCE)
+
+	add_subdirectory(Externals/SDL EXCLUDE_FROM_ALL)
+	set(IMGUI_FILES
+		Externals/imgui/imgui.cpp
+		Externals/imgui/imgui_demo.cpp
+		Externals/imgui/imgui_draw.cpp
+		Externals/imgui/imgui_tables.cpp
+		Externals/imgui/imgui_widgets.cpp
+		Externals/imgui/backends/imgui_impl_sdl3.cpp
+		Externals/imgui/backends/imgui_impl_sdlrenderer3.cpp
+	)
+	set(SDL_LIB SDL3::SDL3)
+endif()
 
 if(Q4B_ENABLE_LZ4)
-	# nothing to configure
+	set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+	set(LZ4_BUNDLED_MODE ON CACHE BOOL "" FORCE)
 
 	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS lz4_static)
@@ -89,12 +116,12 @@ if(Q4B_ENABLE_LZ4)
 endif()
 
 if(Q4B_ENABLE_ZSTD)
+	set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
+	set(ZSTD_MULTITHREAD_SUPPORT ON CACHE BOOL "" FORCE)
 	set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+	set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 	set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 	set(ZSTD_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-	set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-	set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE) # Don't need read support of old files
-	set(ZSTD_MULTITHREAD ON CACHE BOOL "" FORCE) # TODO: Even if this is disabled, Zstd's CMake file still reports multithreading is enabled... should ZSTD_MULTITHREAD_SUPPORT be set instead?
 
 	add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS libzstd_static)
@@ -104,6 +131,8 @@ endif()
 if(Q4B_ENABLE_BROTLI)
 	set(BROTLI_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 	set(BROTLI_BUILD_FOR_PACKAGE OFF CACHE BOOL "" FORCE)
+	set(BROTLI_BUNDLED_MODE ON CACHE BOOL "" FORCE)
+	set(BROTLI_DISABLE_TESTS ON CACHE BOOL "" FORCE)
 
 	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
 	include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
@@ -114,7 +143,7 @@ endif()
 if(Q4B_ENABLE_SNAPPY)
 	set(SNAPPY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 	set(SNAPPY_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
-	set(SNAPPY_FUZZING_BUILD OFF CACHE BOOL "" FORCE) # Disabled by default
+	set(SNAPPY_FUZZING_BUILD OFF CACHE BOOL "" FORCE)
 	set(SNAPPY_REQUIRE_AVX  OFF CACHE BOOL "" FORCE) # Disabled by default, merely sets compiler arch flags
 	set(SNAPPY_REQUIRE_AVX2 OFF CACHE BOOL "" FORCE) # Same
 	set(SNAPPY_INSTALL OFF CACHE BOOL "" FORCE)
@@ -156,14 +185,7 @@ add_executable(${PROJECT_GUI_NAME}
 	_source/q4b_helpers.cpp
 	_source/main_gui.cpp
 
-	Externals/imgui/imgui.cpp
-	Externals/imgui/imgui_demo.cpp
-	Externals/imgui/imgui_draw.cpp
-	Externals/imgui/imgui_tables.cpp
-	Externals/imgui/imgui_widgets.cpp
-	Externals/imgui/backends/imgui_impl_sdl3.cpp
-	Externals/imgui/backends/imgui_impl_sdlrenderer3.cpp
-
+	${IMGUI_FILES}
 	Externals/xxHash/xxhash.c
 )
 
@@ -187,10 +209,11 @@ include_directories(PRIVATE Externals/xxHash)
 
 target_link_libraries(${PROJECT_NAME}     PRIVATE ${Q4B_SCHEME_LIBS})
 target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE SDL3::SDL3)
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${SDL_LIB})
 
 
 # Tests!
+if(Q4B_ENABLE_TESTS)
 enable_testing()
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -216,3 +239,4 @@ target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(${PROJECT_TESTS_NAME})
+endif() #Q4B_ENABLE_TESTS
