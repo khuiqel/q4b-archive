@@ -3,6 +3,8 @@
 #include "lib/compression_data.hpp"
 
 #include <atomic>
+#include <bit>
+#include <concepts>
 #include <unordered_map>
 #include <utility> // std::pair
 #include <vector>
@@ -21,6 +23,40 @@ struct ErrorMessage {
 	ErrorSeverity severity;
 	std::string msg;
 };
+
+/* Converts the endianness to/from LE.
+ *
+ * @tparam bytes Data type
+ * @param input [in] Data
+ *
+ * @return Data byte-swapped on BE, data unchanged on LE.
+ */
+template <std::unsigned_integral bytes>
+constexpr bytes ConvertHostEndianToLittleEndian(bytes input) {
+	if constexpr (std::endian::native == std::endian::little) {
+		return input;
+	} else if constexpr (std::endian::native == std::endian::big) {
+		return std::byteswap(input);
+	} else {
+		// #error "unknown endianness"
+		return input;
+	}
+}
+
+inline void SwapEndiannessIfNeeded(ArchiveHeader& ah) {
+	ah.flags     = ConvertHostEndianToLittleEndian(ah.flags);
+	ah.version   = ConvertHostEndianToLittleEndian(ah.version);
+	ah.num_files = ConvertHostEndianToLittleEndian(ah.num_files);
+	ah.self_hash = ConvertHostEndianToLittleEndian(ah.self_hash);
+}
+inline void SwapEndiannessIfNeeded(ArchivedFileHeader& header) {
+	header.flags             = ConvertHostEndianToLittleEndian(header.flags);
+	header.compression_type  = (CompressionScheme)ConvertHostEndianToLittleEndian((uint32_t)header.compression_type);
+	header.compressed_size   = ConvertHostEndianToLittleEndian(header.compressed_size);
+	header.uncompressed_size = ConvertHostEndianToLittleEndian(header.uncompressed_size);
+	header.compressed_hash   = ConvertHostEndianToLittleEndian(header.compressed_hash);
+	header.uncompressed_hash = ConvertHostEndianToLittleEndian(header.uncompressed_hash);
+}
 
 /* Translates the compression scheme to the compression/decompression functions.
  *

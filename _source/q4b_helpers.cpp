@@ -340,9 +340,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	ArchiveHeader ah;
 	ah.num_files = file_list.size();
 	ah.computeHash();
+	SwapEndiannessIfNeeded(ah);
 	outfile.write((const char*)&ah, sizeof(ah));
 
 	for (auto& [header, f] : compressed_files_data) {
+		SwapEndiannessIfNeeded(header);
 		outfile.write((const char*)&header, sizeof(header));
 	}
 	for (auto& [header, f] : compressed_files_data) {
@@ -391,10 +393,12 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 	int64_t file_size = LoadFileIntoMemory(input, &archive);
 	if (file_size == -1) {
 		//TODO
+		return;
 	}
 
 	ArchiveHeader ah;
 	std::memcpy(&ah, archive, sizeof(ArchiveHeader));
+	SwapEndiannessIfNeeded(ah);
 	if (!std::equal(ah.magic, ah.magic + sizeof(ah.magic), MAGIC_NUM)) {
 		delete[] archive;
 		return;
@@ -422,6 +426,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 
 		ArchivedFileHeader& file_header = compressed_files_headers[i];
 		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
+		SwapEndiannessIfNeeded(file_header);
 		file_offset += sizeof(ArchivedFileHeader);
 	}
 
@@ -500,12 +505,14 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 	int64_t file_size = LoadFileIntoMemory(input, &archive); //TODO: no need to load the entire file...
 	if (file_size == -1) {
 		//TODO
+		return false;
 	}
 	if (file_size < sizeof(ArchiveHeader)) {
 		delete[] archive;
 		return false;
 	}
 	std::memcpy(&header, archive, sizeof(ArchiveHeader));
+	SwapEndiannessIfNeeded(header);
 
 	size_t file_offset = sizeof(ArchiveHeader);
 	for (int i = 0; i < header.num_files; i++) {
@@ -517,6 +524,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 
 		ArchivedFileHeader file_header;
 		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
+		SwapEndiannessIfNeeded(file_header);
 		list.push_back(file_header);
 		file_offset += sizeof(ArchivedFileHeader);
 	}
