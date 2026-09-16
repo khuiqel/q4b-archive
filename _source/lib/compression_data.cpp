@@ -65,8 +65,8 @@ uint64_t CompressionSchemeFunctions_Lz4::Decompress_UnknownSize(const void* inpu
 	const LZ4F_decompressOptions_t dOpt = { 0, 1, 0, 0 };
 
 	LZ4F_frameInfo_t frameInfo;
-	size_t unused;
-	LZ4F_getFrameInfo(dctx, &frameInfo, inputData, &unused);
+	size_t frameInfoSize = compressedSize;
+	size_t ret = LZ4F_getFrameInfo(dctx, &frameInfo, inputData, &frameInfoSize);
 	uint64_t decompressedBufSize = frameInfo.contentSize;
 	if (frameInfo.contentSize == 0) {
 		//https://stackoverflow.com/questions/25740471/lz4-library-decompressed-data-upper-bound-size-estimation#25755758
@@ -74,17 +74,18 @@ uint64_t CompressionSchemeFunctions_Lz4::Decompress_UnknownSize(const void* inpu
 	}
 	*outputData = new char[decompressedBufSize];
 
-	size_t srcPos = 0;
-	size_t ret;
+	size_t srcPos = frameInfoSize;
+	size_t dstPos = 0;
 	do {
-		size_t dstSize = decompressedBufSize;
 		size_t srcSize = compressedSize - srcPos;
-		ret = LZ4F_decompress(dctx, *outputData, &dstSize, (char*)inputData + srcPos, &srcSize, &dOpt);
+		size_t dstSize = decompressedBufSize - dstPos;
+		ret = LZ4F_decompress(dctx, (char*)(*outputData) + dstPos, &dstSize, (const char*)inputData + srcPos, &srcSize, &dOpt);
 		srcPos += srcSize;
+		dstPos += dstSize;
 	} while (srcPos < compressedSize && ret != 0);
 
 	LZ4F_freeDecompressionContext(dctx);
-	return srcPos;
+	return dstPos;
 }
 
 CompressionSchemeFunctions_Lz4::~CompressionSchemeFunctions_Lz4() {
