@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <iostream>
 
-GuiData gdata;
 std::vector<q4b::CompressionFile> FILE_LIST;
 
 auto filepathCleaningFunc = [] (ImGuiInputTextCallbackData* data) {
@@ -128,6 +127,7 @@ int main(int argc, char** argv)
 	// bool set_startup_tab = false;
 	bool rootDirIsLocked = true;
 	bool ret;
+	GuiData gdata;
 
 	// Window icon
 	{
@@ -279,15 +279,15 @@ int main(int argc, char** argv)
 					ImGui::SeparatorText("Change");
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
-					if (ImGui::BeginCombo("Compression Scheme", GuiData::compressionSchemes[gdata.compressionScheme_idx]->displayName)) {
-						for (int n = 0; n < std::size(GuiData::compressionSchemes); n++) {
-							if (ImGui::Selectable(GuiData::compressionSchemes[n]->displayName, gdata.compressionScheme_idx == n)) {
+					if (ImGui::BeginCombo("Compression Scheme", q4b::SCHEME_INFO[gdata.compressionScheme_idx]->displayName)) {
+						for (int n = 0; n < std::size(q4b::SCHEME_INFO); n++) {
+							if (ImGui::Selectable(q4b::SCHEME_INFO[n]->displayName, gdata.compressionScheme_idx == n)) {
 								gdata.set_compressionScheme(n);
 							}
 						}
 						ImGui::EndCombo();
 					}
-					const CompressionSchemeInfo* info = GuiData::compressionSchemes[gdata.compressionScheme_idx];
+					const CompressionSchemeInfo* info = q4b::SCHEME_INFO[gdata.compressionScheme_idx];
 
 					ImGui::Indent();
 
@@ -474,15 +474,15 @@ int main(int argc, char** argv)
 					ImGui::SeparatorText("Change");
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
-					if (ImGui::BeginCombo("Compression Scheme", GuiData::compressionSchemes[gdata.compressionScheme_idx]->displayName)) {
-						for (int n = 0; n < std::size(GuiData::compressionSchemes); n++) {
-							if (ImGui::Selectable(GuiData::compressionSchemes[n]->displayName, gdata.compressionScheme_idx == n)) {
+					if (ImGui::BeginCombo("Compression Scheme", q4b::SCHEME_INFO[gdata.compressionScheme_idx]->displayName)) {
+						for (int n = 0; n < std::size(q4b::SCHEME_INFO); n++) {
+							if (ImGui::Selectable(q4b::SCHEME_INFO[n]->displayName, gdata.compressionScheme_idx == n)) {
 								gdata.set_compressionScheme(n);
 							}
 						}
 						ImGui::EndCombo();
 					}
-					const CompressionSchemeInfo* info = GuiData::compressionSchemes[gdata.compressionScheme_idx];
+					const CompressionSchemeInfo* info = q4b::SCHEME_INFO[gdata.compressionScheme_idx];
 
 					ImGui::Indent();
 					if (info->clevel_str.size() <= 1) { ImGui::BeginDisabled(); }
@@ -546,7 +546,7 @@ int main(int argc, char** argv)
 
 					ImGui::NewLine();
 					if (ImGui::TreeNodeEx("Enabled Schemes", ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DefaultOpen)) {
-						for (const CompressionSchemeInfo* info : GuiData::compressionSchemes) {
+						for (const CompressionSchemeInfo* info : q4b::SCHEME_INFO) {
 							ImGui::BulletText(info->displayName);
 						}
 						ImGui::TreePop();

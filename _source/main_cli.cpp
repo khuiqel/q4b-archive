@@ -13,32 +13,12 @@ static void WriteFile(const std::filesystem::path& output, const char* data, siz
 	o.write(data, size);
 }
 
-//TODO: CLI and GUI and q4b_helpers should share this
-CompressionSchemeInfo* SCHEME_INFO[] = {
-	new CompressionSchemeInfo_Uncompressed(),
-	#ifdef Q4B_ENABLE_LZ4
-	new CompressionSchemeInfo_Lz4(),
-	#endif
-	#ifdef Q4B_ENABLE_ZSTD
-	new CompressionSchemeInfo_Zstd(),
-	#endif
-	#ifdef Q4B_ENABLE_BROTLI
-	new CompressionSchemeInfo_Brotli(),
-	#endif
-	#ifdef Q4B_ENABLE_SNAPPY
-	new CompressionSchemeInfo_Snappy(),
-	#endif
-	#ifdef Q4B_ENABLE_STB
-	new CompressionSchemeInfo_Stb(),
-	#endif
-};
-
 int main(int argc, char** argv) {
 
 	std::string DESCRIPTION_STR = "Enabled schemes: Uncompressed";
-	for (int i = 1; i < std::size(SCHEME_INFO); i++) {
+	for (int i = 1; i < std::size(q4b::SCHEME_INFO); i++) {
 		DESCRIPTION_STR += ", ";
-		DESCRIPTION_STR += SCHEME_INFO[i]->displayName;
+		DESCRIPTION_STR += q4b::SCHEME_INFO[i]->displayName;
 	}
 
 	CLI::App app(DESCRIPTION_STR);

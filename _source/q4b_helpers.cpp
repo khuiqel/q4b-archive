@@ -5,9 +5,27 @@
 #include <fstream>
 #include <iostream>
 
-#include "app/compression_info.hpp"
-
 namespace q4b {
+
+CompressionSchemeInfo* SCHEME_INFO[] = {
+	new CompressionSchemeInfo_Uncompressed(),
+	#ifdef Q4B_ENABLE_LZ4
+	new CompressionSchemeInfo_Lz4(),
+	#endif
+	#ifdef Q4B_ENABLE_ZSTD
+	new CompressionSchemeInfo_Zstd(),
+	#endif
+	#ifdef Q4B_ENABLE_BROTLI
+	new CompressionSchemeInfo_Brotli(),
+	#endif
+	#ifdef Q4B_ENABLE_SNAPPY
+	new CompressionSchemeInfo_Snappy(),
+	#endif
+	#ifdef Q4B_ENABLE_STB
+	new CompressionSchemeInfo_Stb(),
+	#endif
+};
+//TODO: verify there are exactly the right amount of schemes, C++ doesn't really support this
 
 CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme) {
 	switch (scheme) {
@@ -51,27 +69,6 @@ void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept {
 	);
 	file_list.erase(it, file_list.end());
 }
-
-//TODO: CLI and GUI and q4b_helpers should share this
-CompressionSchemeInfo* SCHEME_INFO[] = {
-	new CompressionSchemeInfo_Uncompressed(),
-	#ifdef Q4B_ENABLE_LZ4
-	new CompressionSchemeInfo_Lz4(),
-	#endif
-	#ifdef Q4B_ENABLE_ZSTD
-	new CompressionSchemeInfo_Zstd(),
-	#endif
-	#ifdef Q4B_ENABLE_BROTLI
-	new CompressionSchemeInfo_Brotli(),
-	#endif
-	#ifdef Q4B_ENABLE_SNAPPY
-	new CompressionSchemeInfo_Snappy(),
-	#endif
-	#ifdef Q4B_ENABLE_STB
-	new CompressionSchemeInfo_Stb(),
-	#endif
-};
-static_assert(std::size(SCHEME_INFO) == ENABLED_SCHEMES_COUNT);
 
 // Don't delete the return value!
 static CompressionSchemeInfo* SchemeToInfo(CompressionScheme scheme) {

@@ -2,7 +2,6 @@
 #include <vector>
 #include <imgui.h>
 #include "q4b_helpers.hpp"
-#include "app/compression_info.hpp"
 
 struct GuiData {
 	// Archive stuff
@@ -16,26 +15,24 @@ struct GuiData {
 
 	// Compressing files
 
-	static CompressionSchemeInfo* compressionSchemes[q4b::ENABLED_SCHEMES_COUNT];
-
 	int compressionScheme_idx;
 	int compressionLevel_idx;
 	void set_compressionScheme(int idx) {
 		compressionScheme_idx = idx;
-		compressionLevel_idx = compressionSchemes[compressionScheme_idx]->clevel_default_idx;
+		compressionLevel_idx = q4b::SCHEME_INFO[compressionScheme_idx]->clevel_default_idx;
 	}
 
 	q4b::CompressionScheme get_compression_type() const {
-		return compressionSchemes[compressionScheme_idx]->scheme;
+		return q4b::SCHEME_INFO[compressionScheme_idx]->scheme;
 	}
 	int get_compression_level() const {
-		return compressionSchemes[compressionScheme_idx]->clevel_val[compressionLevel_idx];
+		return q4b::SCHEME_INFO[compressionScheme_idx]->clevel_val[compressionLevel_idx];
 	}
 
-	static void Initialize();
-	static void Uninitialize();
-
 	GuiData();
+
+private:
+	static void Initialize();
 };
 
 // Extra functions to add deletion support to ImGuiSelectionBasicStorage

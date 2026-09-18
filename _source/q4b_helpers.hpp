@@ -1,5 +1,6 @@
 #pragma once
 #include "q4b.hpp"
+#include "app/compression_info.hpp"
 #include "lib/compression_data.hpp"
 
 #include <atomic>
@@ -23,6 +24,8 @@ struct ErrorMessage {
 	ErrorSeverity severity;
 	std::string msg;
 };
+
+extern CompressionSchemeInfo* SCHEME_INFO[ENABLED_SCHEMES_COUNT];
 
 /* Converts the endianness to/from LE.
  *
