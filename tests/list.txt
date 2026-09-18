@@ -1,0 +1,2 @@
+res/NotoSans-Regular.ttf lz4 1
+res/NotoSans-Regular.ttf zstd 3

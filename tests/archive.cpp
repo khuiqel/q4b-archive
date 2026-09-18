@@ -10,6 +10,7 @@ const std::filesystem::path TEST_ARCHIVE_PATH_2 = "tests/test2.q4b";
 const std::filesystem::path TEST_FILE = "res/NotoSans-Regular.ttf";
 const std::filesystem::path TEST_FILE_2 = "res/../res/NotoSans-Regular.ttf"; //TODO: get another file
 const std::filesystem::path TEST_FILE_NONEXISTANT = "nope.txt";
+const std::filesystem::path TEST_LIST_FILE = "tests/list.txt";
 constexpr int THREAD_COUNT = 4;
 
 namespace {
@@ -374,6 +375,28 @@ TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
 
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+}
+#endif
+
+
+#if defined(Q4B_ENABLE_LZ4) && defined(Q4B_ENABLE_ZSTD)
+TEST(Others, ConvertTextToFileList) {
+	std::vector<q4b::CompressionFile> files;
+	q4b::ReadArchiveInputFile(TEST_LIST_FILE, files);
+	ASSERT_TRUE(files.size() == 2);
+
+	const std::string path1 = files[0].data.path;
+	const std::string path2 = files[1].data.path;
+	EXPECT_TRUE(path1 == TEST_FILE.generic_string());
+	EXPECT_TRUE(path2 == TEST_FILE.generic_string());
+
+	EXPECT_TRUE(files[0].data.compression_type == q4b::CompressionScheme::lz4);
+	EXPECT_TRUE(files[0].compression_level == 1);
+	EXPECT_TRUE(files[0].compression_flags == 0);
+
+	EXPECT_TRUE(files[1].data.compression_type == q4b::CompressionScheme::zstd);
+	EXPECT_TRUE(files[1].compression_level == 3);
+	EXPECT_TRUE(files[1].compression_flags == 0);
 }
 #endif
 

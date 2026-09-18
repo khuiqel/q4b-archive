@@ -571,4 +571,60 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) n
 	// No need to call file.close() because fstream destructors close automatically
 }
 
+// Returns 1 on failure, sets scheme on success
+int ExtToScheme(const std::string& FILE_EXT, CompressionScheme* scheme) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
+		for (const auto& ext : info->fileExtensions) {
+			if (FILE_EXT == ext) {
+				*scheme = info->scheme;
+				return 0;
+			}
+		}
+	}
+	std::cerr << "ERROR: could not determine scheme\n";
+	return 1;
+}
+
+// Returns 1 on failure, sets scheme on success
+int StrToScheme(const std::string& SCHEME, CompressionScheme* scheme) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
+		for (const auto& name : info->searchNames) {
+			if (SCHEME == name) {
+				*scheme = info->scheme;
+				return 0;
+			}
+		}
+	}
+	std::cerr << "ERROR: unknown scheme\n";
+	return 1;
+}
+
+std::string SchemeToFileExt(CompressionScheme scheme) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
+		if (scheme == info->scheme) {
+			return info->fileExtensions[0];
+		}
+	}
+	return "";
+}
+
+void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) {
+	std::ifstream f(input);
+	std::string line;
+	while (std::getline(f, line)) {
+		size_t pos_start, pos_end;
+		pos_start = line.find_first_of(" ");
+		std::string filename = line.substr(0, pos_start);
+		pos_end = line.find_first_of(" ", pos_start+1);
+		std::string scheme = line.substr(pos_start+1, pos_end - pos_start - 1);
+		pos_start = pos_end;
+		pos_end = line.find_first_of(" ", pos_start+1);
+		std::string level = line.substr(pos_start+1, pos_end - pos_start - 1);
+
+		CompressionScheme s;
+		StrToScheme(scheme, &s);
+		file_list.push_back({ filename, s, std::stoi(level) });
+	}
+}
+
 } // namespace q4b

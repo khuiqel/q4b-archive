@@ -213,7 +213,7 @@ target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${SDL_LIB})
 
 
 # Tests!
-if(Q4B_ENABLE_TESTS)
+if(Q4B_BUILD_TESTS)
 enable_testing()
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -239,4 +239,4 @@ target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(${PROJECT_TESTS_NAME})
-endif() #Q4B_ENABLE_TESTS
+endif() #Q4B_BUILD_TESTS

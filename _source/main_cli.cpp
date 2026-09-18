@@ -2,6 +2,7 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 #include <fstream>
+#include <climits> //INT_MAX
 #include <chrono>
 #include "q4b_helpers.hpp"
 #include "app/compression_info.hpp"
@@ -31,60 +32,6 @@ CompressionSchemeInfo* SCHEME_INFO[] = {
 	new CompressionSchemeInfo_Stb(),
 	#endif
 };
-
-// Returns 1 on failure, sets scheme on success
-static int ExtToScheme(const std::string& FILE_EXT, q4b::CompressionScheme* scheme) {
-	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
-		for (const auto& ext : info->fileExtensions) {
-			if (FILE_EXT == ext) {
-				*scheme = info->scheme;
-				return 0;
-			}
-		}
-	}
-	std::cerr << "ERROR: could not determine scheme\n";
-	return 1;
-}
-
-// Returns 1 on failure, sets scheme on success
-static int StrToScheme(const std::string& SCHEME, q4b::CompressionScheme* scheme) {
-	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
-		for (const auto& name : info->searchNames) {
-			if (SCHEME == name) {
-				*scheme = info->scheme;
-				return 0;
-			}
-		}
-	}
-	std::cerr << "ERROR: unknown scheme\n";
-	return 1;
-}
-
-static std::string SchemeToFileExt(q4b::CompressionScheme scheme) {
-	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
-		if (scheme == info->scheme) {
-			return info->fileExtensions[0];
-		}
-	}
-	return "";
-}
-
-static void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<q4b::CompressionFile>& file_list) {
-	std::ifstream f(input);
-	std::string line;
-	while (std::getline(f, line)) {
-		size_t pos_start, pos_end;
-		pos_start = line.find_first_of(" ");
-		std::string filename = line.substr(0, pos_start);
-		pos_end = line.find_first_of(" ", pos_start+1);
-		std::string scheme = line.substr(pos_start+1, pos_end - pos_start - 1);
-		pos_start = pos_end;
-		pos_end = line.find_first_of(" ", pos_start+1);
-		std::string level = line.substr(pos_start+1, pos_end - pos_start - 1);
-
-		file_list.push_back({ filename, q4b::CompressionScheme::lz4, std::stoi(level) });
-	}
-}
 
 int main(int argc, char** argv) {
 
@@ -139,7 +86,7 @@ int main(int argc, char** argv) {
 		const std::string ARCHIVE    = subcom_archive->get_option_no_throw("output_archive")->as<std::string>();
 
 		std::vector<q4b::CompressionFile> file_list;
-		ReadArchiveInputFile(FILES, file_list);
+		q4b::ReadArchiveInputFile(FILES, file_list);
 
 		std::vector<q4b::ErrorMessage> messages;
 		q4b::WriteArchive(file_list, ".", ARCHIVE, 4, &messages);
@@ -152,7 +99,7 @@ int main(int argc, char** argv) {
 		                               "." : subcom_archive->get_option_no_throw("-o")->as<std::string>();
 
 		std::vector<q4b::CompressionFile> file_list;
-		ReadArchiveInputFile(FILES, file_list);
+		q4b::ReadArchiveInputFile(FILES, file_list);
 
 		q4b::DecodeArchive(ARCHIVE, OUTPUT_DIR);
 
@@ -198,7 +145,7 @@ int main(int argc, char** argv) {
 
 		q4b::CompressionScheme scheme;
 		int ret;
-		ret = StrToScheme(SCHEME, &scheme);
+		ret = q4b::StrToScheme(SCHEME, &scheme);
 		if (ret) { return 1; }
 
 		if (scheme == q4b::CompressionScheme::Uncompressed) {
@@ -269,9 +216,9 @@ int main(int argc, char** argv) {
 		q4b::CompressionScheme scheme;
 		int ret;
 		if (SCHEME == "") {
-			ret = ExtToScheme(std::filesystem::path(INPUT).extension().string(), &scheme);
+			ret = q4b::ExtToScheme(std::filesystem::path(INPUT).extension().string(), &scheme);
 		} else {
-			ret = StrToScheme(SCHEME, &scheme);
+			ret = q4b::StrToScheme(SCHEME, &scheme);
 		}
 		if (ret) { return 1; }
 

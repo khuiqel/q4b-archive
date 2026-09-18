@@ -196,4 +196,23 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  */
 [[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) noexcept;
 
+// Returns 1 on failure, sets scheme on success
+int ExtToScheme(const std::string& FILE_EXT, CompressionScheme* scheme);
+
+// Returns 1 on failure, sets scheme on success
+int StrToScheme(const std::string& SCHEME, CompressionScheme* scheme);
+
+// Returns an empty string if the scheme doesn't exist
+std::string SchemeToFileExt(q4b::CompressionScheme scheme);
+
+/* Reads a text file containing files to be compressed. Intended for the CLI.
+ *
+ * @param input [in] The text file. Format is "filename scheme level" per line. (TODO: support spaces in filename, also zstd --max... maybe this function just splits on spaces?)
+ * @param file_list [out] Output file list.
+ *
+ * @return void
+ * TODO: errors
+ */
+void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list);
+
 } // namespace q4b
