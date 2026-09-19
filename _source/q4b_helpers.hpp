@@ -78,7 +78,8 @@ CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme);
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
 
 /* Internal function for writing archives and quick compression. Won't begin on certain failures
- * (like invalid scheme or duplicates). Will continue if the compression encounters an error.
+ * (like invalid scheme or nonexistence). Will continue if the compression encounters an error.
+ * Does not have a flag for signalling when it's done because it's not supposed to be used by itself.
  * TODO: another tparam for quitting early on error?
  *
  * @tparam GenericExport Does the generic export version of compress. Will not calculate the ArchivedFileHeader hashes.
@@ -89,7 +90,7 @@ template <bool extraFeatures, bool GenericExport>
 std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
 void WriteCompressedFiles_internal(

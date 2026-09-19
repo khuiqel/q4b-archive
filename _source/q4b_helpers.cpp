@@ -84,9 +84,9 @@ template <bool extraFeatures, bool GenericExport>
 std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
-	// Check for valid compression schemes, existence, duplicates
+	// Check for valid compression schemes and existence
 	{
 		bool allSchemesValid = true;
 		for (int i = 0; i < file_list.size(); i++) {
@@ -96,43 +96,18 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 			}
 		}
 		if (!allSchemesValid) {
-			if constexpr (extraFeatures) working_flag->store(false);
 			return {};
 		}
 
 		bool allFilesExist = true;
 		for (int i = 0; i < file_list.size(); i++) {
-			if (!file_list[i].data.pathIsValid()) {
-				messages->push_back({ ErrorSeverity::error, "File idx " + std::to_string(i) + " is invalid" });
-				allFilesExist = false;
-				//TODO: maybe this function should copy file_list to prevent someone modifying the files
-			} else if (!std::filesystem::exists(root_file_path / file_list[i].data.path)) {
+			if (!std::filesystem::exists(root_file_path / file_list[i].data.path)) {
 				messages->push_back({ ErrorSeverity::error, std::string(file_list[i].data.path) + " doesn't exist" });
 				allFilesExist = false;
+				//TODO: maybe this function should copy file_list to prevent someone modifying the files
 			}
 		}
 		if (!allFilesExist) {
-			if constexpr (extraFeatures) working_flag->store(false);
-			return {};
-		}
-
-		bool duplicatesExist = false;
-		std::vector<std::string> sorted_list; sorted_list.reserve(file_list.size());
-		std::transform(file_list.begin(), file_list.end(),
-			std::back_inserter(sorted_list),
-			[](const CompressionFile& file) { return file.data.path; }
-		);
-		std::sort(sorted_list.begin(), sorted_list.end(), [](const auto& lhs, const auto& rhs) {
-			return lhs < rhs;
-		});
-		for (int i = 1; i < file_list.size(); i++) {
-			if (sorted_list[i-1] == sorted_list[i]) {
-				messages->push_back({ ErrorSeverity::error, sorted_list[i] + " has a duplicate" });
-				duplicatesExist = true;
-			}
-		}
-		if (duplicatesExist) {
-			if constexpr (extraFeatures) working_flag->store(false);
 			return {};
 		}
 	}
@@ -144,7 +119,6 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 		if constexpr (extraFeatures)
 			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
 				messages->push_back({ ErrorSeverity::info, "Quitting early" });
-				working_flag->store(false);
 				return compressed_files_data;
 			}
 
@@ -206,25 +180,24 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 	}
 	//TODO: maybe push an info message for each one compressed
 
-	if constexpr (extraFeatures) working_flag->store(false);
 	return compressed_files_data;
 }
 template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, false>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, false>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
 void WriteCompressedFiles_internal(
@@ -232,11 +205,35 @@ void WriteCompressedFiles_internal(
 	std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
+	// Check for duplicate filenames
+	// Valid schemes and existence are checked in CompressFiles_internal()
+	{
+		bool duplicatesExist = false;
+		std::vector<std::string> sorted_list; sorted_list.reserve(file_list.size());
+		std::transform(file_list.begin(), file_list.end(),
+			std::back_inserter(sorted_list),
+			[](const CompressionFile& file) { return std::filesystem::path(file.data.path).filename().string(); }
+		);
+		std::sort(sorted_list.begin(), sorted_list.end(), [](const auto& lhs, const auto& rhs) {
+			return lhs < rhs;
+		});
+		for (int i = 1; i < file_list.size(); i++) {
+			if (sorted_list[i-1] == sorted_list[i]) {
+				messages->push_back({ ErrorSeverity::error, sorted_list[i] + " has a duplicate" });
+				duplicatesExist = true;
+			}
+		}
+		if (duplicatesExist) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+	}
+
 	// Compress files
 	auto compressed_files_data = CompressFiles_internal<extraFeatures, true>(
 		file_list, root_file_path,
 		messages,
-		working_flag, exit_flag, files_completed);
+		exit_flag, files_completed);
 
 	if (compressed_files_data.size() != file_list.size()) {
 		//TODO
@@ -288,9 +285,46 @@ template void WriteCompressedFiles_internal<false>(
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
-void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                  int threadCount, std::vector<ErrorMessage>* messages,
-                  std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+void WriteArchive_internal(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	int threadCount, std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	// Check for valid paths and duplicate paths
+	// Valid schemes and existence are checked in CompressFiles_internal()
+	{
+		bool allFilesExist = true;
+		for (int i = 0; i < file_list.size(); i++) {
+			if (!file_list[i].data.pathIsValid()) {
+				messages->push_back({ ErrorSeverity::error, "File idx " + std::to_string(i) + " is invalid" });
+				allFilesExist = false;
+			}
+		}
+		if (!allFilesExist) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+
+		bool duplicatesExist = false;
+		std::vector<std::string> sorted_list; sorted_list.reserve(file_list.size());
+		std::transform(file_list.begin(), file_list.end(),
+			std::back_inserter(sorted_list),
+			[](const CompressionFile& file) { return file.data.path; }
+		);
+		std::sort(sorted_list.begin(), sorted_list.end(), [](const auto& lhs, const auto& rhs) {
+			return lhs < rhs;
+		});
+		for (int i = 1; i < file_list.size(); i++) {
+			if (sorted_list[i-1] == sorted_list[i]) {
+				messages->push_back({ ErrorSeverity::error, sorted_list[i] + " has a duplicate" });
+				duplicatesExist = true;
+			}
+		}
+		if (duplicatesExist) {
+			if constexpr (extraFeatures) working_flag->store(false);
+			return;
+		}
+	}
 
 	// Open file
 	const std::filesystem::path output_tmp = output.string() + ".tmp";
@@ -306,7 +340,7 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
 	auto compressed_files_data = CompressFiles_internal<extraFeatures, false>(
 		file_list, root_file_path,
 		messages,
-		working_flag, exit_flag, files_completed);
+		exit_flag, files_completed);
 
 	if (compressed_files_data.size() != file_list.size()) {
 		//TODO
