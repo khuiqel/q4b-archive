@@ -44,11 +44,11 @@ bool ArchivedFileHeader::pathIsValid() const {
 	return true;
 };
 
-void ArchivedFileHeader::setPath(const std::filesystem::path& path) {
-	const std::string p = path.generic_string();
+void ArchivedFileHeader::setPath(const std::string& path) {
+	const std::string p = path;
 	size_t charCount = std::min(p.size(), size_t(Q4B_MAX_PATH-1));
 	std::copy(p.begin(), p.begin() + charCount, this->path);
-	//std::replace(this->path, this->path + charCount, '\\', '/'); // Unnecessary due to .generic_string()
+	std::replace(this->path, this->path + charCount, '\\', '/');
 	std::fill(this->path + charCount, this->path + Q4B_MAX_PATH, '\0');
 }
 

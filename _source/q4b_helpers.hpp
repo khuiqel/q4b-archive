@@ -6,26 +6,43 @@
 #include <atomic>
 #include <bit>
 #include <concepts>
+#include <filesystem>
 #include <unordered_map>
 #include <utility> // std::pair
 #include <vector>
 
 namespace q4b {
 
-enum class ErrorSeverity {
-	Unknown,
-	info,
-	warn,
-	error,
-	Count
-};
-
-struct ErrorMessage {
-	ErrorSeverity severity;
-	std::string msg;
-};
-
 extern CompressionSchemeInfo* SCHEME_INFO[ENABLED_SCHEMES_COUNT];
+
+struct CompressionFile {
+	ArchivedFileHeader data;
+	int32_t compression_level;
+	uint32_t compression_flags;
+
+	inline const char* getFilepath() const {
+		return data.path;
+	}
+
+	inline void setFlag(Q4B_CompressionFileFlags flag) { compression_flags |= static_cast<uint32_t>(flag); }
+	inline void unsetFlag(Q4B_CompressionFileFlags flag) { compression_flags &= ~static_cast<uint32_t>(flag); }
+	inline bool getFlag(Q4B_CompressionFileFlags flag) const { return compression_flags & static_cast<uint32_t>(flag); }
+
+	CompressionFile() {
+		data.setPath("");
+		data.compression_type = CompressionScheme::Uncompressed;
+		data.flags = 0;
+		compression_level = 0;
+		compression_flags = 0;
+	}
+	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
+		data.setPath(file.string());
+		data.compression_type = compression_type_;
+		data.flags = 0;
+		compression_level = compression_level_;
+		compression_flags = 0;
+	}
+};
 
 /* Converts the endianness to/from LE.
  *
@@ -76,6 +93,19 @@ CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme);
  * @return void
  */
 void ExistencePrune(std::vector<CompressionFile>& file_list) noexcept;
+
+enum class ErrorSeverity {
+	Unknown,
+	info,
+	warn,
+	error,
+	Count
+};
+
+struct ErrorMessage {
+	ErrorSeverity severity;
+	std::string msg;
+};
 
 /* Internal function for writing archives and quick compression. Won't begin on certain failures
  * (like invalid scheme or nonexistence). Will continue if the compression encounters an error.
@@ -208,6 +238,9 @@ int StrToScheme(const std::string& SCHEME, CompressionScheme* scheme);
 
 // Returns an empty string if the scheme doesn't exist
 std::string SchemeToFileExt(q4b::CompressionScheme scheme);
+
+// Returns "Unknown" for unknown/disabled schemes
+const char* SchemeToDisplayStr(CompressionScheme scheme);
 
 /* Reads a text file containing files to be compressed. Intended for the CLI.
  *

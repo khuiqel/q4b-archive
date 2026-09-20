@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
 		          << archiveHeader.self_hash << std::endl;
 		for (const q4b::ArchivedFileHeader& file_header : fileList) {
 			std::cout << file_header.path << " "
-			          << q4b::CompressionToStr(file_header.compression_type) << " "
+			          << q4b::SchemeToDisplayStr(file_header.compression_type) << " "
 			          << file_header.compressed_size << " "
 			          << file_header.uncompressed_size << " "
 			          << file_header.compressed_hash << " "
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
 			std::cout << timeDiff << '\n'
 			          << file_size << '\n' // Only outputting this to be ultra-robust
 			          << decompressedSize << '\n'
-			          << q4b::CompressionToStr(scheme);
+			          << q4b::SchemeToDisplayStr(scheme);
 			// Don't bother cleaning up
 		} else {
 			delete functions;

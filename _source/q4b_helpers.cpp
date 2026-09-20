@@ -91,7 +91,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 		bool allSchemesValid = true;
 		for (int i = 0; i < file_list.size(); i++) {
 			if (!SchemeIsEnabled(file_list[i].data.compression_type)) {
-				messages->push_back({ ErrorSeverity::error, "Unavailable scheme: " + std::string(CompressionToStr(file_list[i].data.compression_type)) });
+				messages->push_back({ ErrorSeverity::error, "Unavailable scheme: " + std::string(SchemeToDisplayStr(file_list[i].data.compression_type)) });
 				allSchemesValid = false;
 			}
 		}
@@ -501,7 +501,7 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 			outfile.close();
 			//TODO: should probably check hashes and size again, since the compressed_size could not equal the uncompressed size on ill-formatted data
 		} else if (functions == nullptr) {
-			std::cerr << "ERROR: Unknown compression: " << q4b::CompressionToStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
+			std::cerr << "ERROR: Unknown compression: " << q4b::SchemeToDisplayStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
 		} else {
 			void* outputData;
 			uint64_t decompressedSize = functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
@@ -637,6 +637,15 @@ std::string SchemeToFileExt(CompressionScheme scheme) {
 		}
 	}
 	return "";
+}
+
+const char* SchemeToDisplayStr(CompressionScheme scheme) {
+	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
+		if (scheme == info->scheme) {
+			return info->displayName;
+		}
+	}
+	return "Unknown";
 }
 
 void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) {

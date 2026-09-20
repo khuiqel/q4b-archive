@@ -51,7 +51,7 @@ struct CompressionSchemeInfo_Uncompressed final : public CompressionSchemeInfo {
 		usableForGenericExport = false; // Technically yes, but don't bother officially supporting because why
 
 		recommendation = CompressionSchemeRecommendedLevel::No_Opinion;
-		displayName = "Uncompressed"; //TODO: q4b::CompressionToStr()
+		displayName = "Uncompressed";
 		informationText = "No compression scheme.";
 
 		helpText = "TODO";

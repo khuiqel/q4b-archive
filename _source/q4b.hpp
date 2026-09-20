@@ -11,7 +11,7 @@
 
 #pragma once
 #include <cstdint>
-#include <filesystem>
+#include <string>
 #include <type_traits> // std::is_trivially_copyable
 #include <xxhash.h>
 
@@ -64,31 +64,12 @@ constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
 };
 constexpr size_t ENABLED_SCHEMES_COUNT = std::size(LIST_OF_ENABLED_SCHEMES);
 
-inline bool SchemeIsEnabled(CompressionScheme c) {
+inline bool SchemeIsEnabled(CompressionScheme scheme) {
 	// If you want an O(1) lookup instead of O(n), use a switch statement
 	for (CompressionScheme s : LIST_OF_ENABLED_SCHEMES) {
-		if (s == c) return true;
+		if (s == scheme) return true;
 	}
 	return false;
-}
-
-inline const char* CompressionToStr(CompressionScheme c) {
-	switch (c) {
-		default: return "Unknown";
-
-		case CompressionScheme::Uncompressed: return "Uncompressed";
-		case CompressionScheme::lz4:          return "LZ4";
-		case CompressionScheme::zstd:         return "Zstd";
-		// case CompressionScheme::zstd_dict:    return "Zstd_dict";
-
-		case CompressionScheme::brotli:       return "Brotli";
-		case CompressionScheme::snappy:       return "Snappy";
-		// case CompressionScheme::lzma:         return "LZMA";
-		// case CompressionScheme::bzip2:        return "bzip2";
-		// case CompressionScheme::zlib:         return "zlib";
-		// case CompressionScheme::lz4_dict:     return "LZ4_dict";
-		case CompressionScheme::stb:          return "stb";
-	}
 }
 
 inline XXH64_hash_t ComputeHash(void* data, size_t size) {
@@ -117,6 +98,9 @@ enum class Q4B_ArchivedFileFlags : uint32_t {
 	MetadataEmbedded             = 1 << 0,
 };
 
+inline uint32_t operator&(Q4B_ArchivedFileFlags lhs, Q4B_ArchivedFileFlags rhs) { return static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs); }
+inline uint32_t operator|(Q4B_ArchivedFileFlags lhs, Q4B_ArchivedFileFlags rhs) { return static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs); }
+
 struct ArchivedFileHeader {
 	char path[Q4B_MAX_PATH];
 	uint32_t flags;
@@ -133,7 +117,7 @@ struct ArchivedFileHeader {
 	inline bool getFlag(Q4B_ArchivedFileFlags flag) const { return flags & static_cast<uint32_t>(flag); }
 
 	bool pathIsValid() const; // Returns true for: 1. no backslashes; 2. last byte in array is \0 (to be able to make it a string); 3. end of string to end of array is \0 //TODO: another function to check for NTFS-invalid characters
-	void setPath(const std::filesystem::path& path); // Writes the path, replacing backslashes and filling the remainder of the array with \0
+	void setPath(const std::string& path); // Writes the path, replacing backslashes and filling the remainder of the array with \0
 };
 static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
@@ -148,35 +132,5 @@ enum class Q4B_CompressionFileFlags : uint32_t {
 
 inline uint32_t operator&(Q4B_CompressionFileFlags lhs, Q4B_CompressionFileFlags rhs) { return static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs); }
 inline uint32_t operator|(Q4B_CompressionFileFlags lhs, Q4B_CompressionFileFlags rhs) { return static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs); }
-
-//note: this is for the application, the previous one is for the archive
-struct CompressionFile {
-	ArchivedFileHeader data;
-	int32_t compression_level;
-	uint32_t compression_flags;
-
-	inline const char* getFilepath() const {
-		return data.path;
-	}
-
-	inline void setFlag(Q4B_CompressionFileFlags flag) { compression_flags |= static_cast<uint32_t>(flag); }
-	inline void unsetFlag(Q4B_CompressionFileFlags flag) { compression_flags &= ~static_cast<uint32_t>(flag); }
-	inline bool getFlag(Q4B_CompressionFileFlags flag) const { return compression_flags & static_cast<uint32_t>(flag); }
-
-	CompressionFile() {
-		data.setPath("");
-		data.compression_type = CompressionScheme::Uncompressed;
-		data.flags = 0;
-		compression_level = 0;
-		compression_flags = 0;
-	}
-	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
-		data.setPath(file);
-		data.compression_type = compression_type_;
-		data.flags = 0;
-		compression_level = compression_level_;
-		compression_flags = 0;
-	}
-};
 
 } // namespace q4b

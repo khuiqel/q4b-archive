@@ -251,7 +251,7 @@ int main(int argc, char** argv)
 						ImGui::SetKeyboardFocusHere(-1);
 
 					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(q4b::CompressionToStr(FILE_LIST[n].data.compression_type));
+					ImGui::TextUnformatted(q4b::SchemeToDisplayStr(FILE_LIST[n].data.compression_type));
 
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
@@ -456,7 +456,7 @@ int main(int argc, char** argv)
 									ImGui::TableSetColumnIndex(0);
 									ImGui::TextUnformatted(file_header.path);
 									ImGui::TableNextColumn();
-									ImGui::TextUnformatted(q4b::CompressionToStr(file_header.compression_type));
+									ImGui::TextUnformatted(q4b::SchemeToDisplayStr(file_header.compression_type));
 									ImGui::TableNextColumn();
 									ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
 									ImGui::TableNextColumn();
