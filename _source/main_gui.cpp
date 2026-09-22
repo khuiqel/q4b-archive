@@ -163,7 +163,7 @@ int main(int argc, char** argv)
     bool done = false;
     while (!done)
     {
-		const bool THREAD_IS_WORKING = thread_func_working.load();
+		const bool THREAD_IS_WORKING = thread_func_working.load(std::memory_order_acquire);
 
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -396,7 +396,7 @@ int main(int argc, char** argv)
 				const bool EXIT_EARLY = thread_func_exit_early.load(std::memory_order_acquire);
 				if (EXIT_EARLY) { ImGui::BeginDisabled(); }
 				if (ImGui::Button("Cancel")) {
-					thread_func_exit_early.store(true);
+					thread_func_exit_early.store(true, std::memory_order_release);
 				}
 				if (EXIT_EARLY) { ImGui::EndDisabled(); }
 			};
@@ -427,9 +427,10 @@ int main(int argc, char** argv)
 					} else {
 						if (ImGui::Button("Create Archive")) {
 							gdata.messages.clear();
-							thread_func_working.store(true);
+							//TODO: give these a memory order once thread management becomes better
+							thread_files_completed.store(0); //this should probably be std::memory_order_acq_rel
 							thread_func_exit_early.store(false);
-							thread_files_completed.store(0);
+							thread_func_working.store(true);
 							std::thread t(q4b::WriteArchive_internal<true>, FILE_LIST, root_file_path, archive_file_path, gdata.threadCount, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 							t.detach();
 							//TODO: should probably make a global thread instead of re-creating one
@@ -541,9 +542,9 @@ int main(int argc, char** argv)
 					} else {
 						if (ImGui::Button("Compress Files")) {
 							gdata.messages.clear();
-							thread_func_working.store(true);
-							thread_func_exit_early.store(false);
 							thread_files_completed.store(0);
+							thread_func_exit_early.store(false);
+							thread_func_working.store(true);
 							std::thread t(q4b::WriteCompressedFiles_internal<true>, FILE_LIST, root_file_path, output_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 							t.detach();
 						}
@@ -623,7 +624,7 @@ int main(int argc, char** argv)
         SDL_RenderPresent(renderer);
     }
 
-	thread_func_exit_early.store(true);
+	thread_func_exit_early.store(true, std::memory_order_release);
 
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]

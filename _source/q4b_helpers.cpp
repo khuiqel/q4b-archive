@@ -176,9 +176,12 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 			}
 		}
 
+		// The main thread doesn't care about this value, *until it needs to be reset*,
+		// so relaxed can't be used. (*Technically* this thread will end before the
+		// main thread resets the value, so relaxed is fine...)
+		// A RMW is always safe between threads, so std::memory_order_acq_rel isn't needed.
 		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
 	}
-	//TODO: maybe push an info message for each one compressed
 
 	return compressed_files_data;
 }
@@ -224,7 +227,7 @@ void WriteCompressedFiles_internal(
 			}
 		}
 		if (duplicatesExist) {
-			if constexpr (extraFeatures) working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 	}
@@ -245,7 +248,7 @@ void WriteCompressedFiles_internal(
 			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
-			working_flag->store(false);
+			working_flag->store(false, std::memory_order_release);
 			return;
 		}
 
@@ -255,7 +258,7 @@ void WriteCompressedFiles_internal(
 			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
-			if constexpr (extraFeatures) working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 	}
@@ -273,7 +276,7 @@ void WriteCompressedFiles_internal(
 		// The pointer can only be nullptr if there was an error
 		delete[] compressed_files_data[i].second;
 	}
-	if constexpr (extraFeatures) working_flag->store(false);
+	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 }
 template void WriteCompressedFiles_internal<true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
@@ -301,7 +304,7 @@ void WriteArchive_internal(
 			}
 		}
 		if (!allFilesExist) {
-			if constexpr (extraFeatures) working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 
@@ -321,7 +324,7 @@ void WriteArchive_internal(
 			}
 		}
 		if (duplicatesExist) {
-			if constexpr (extraFeatures) working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 	}
@@ -332,7 +335,7 @@ void WriteArchive_internal(
 	if (!outfile) {
 		// TODO: Is std::atomic_thread_fence needed for messages? Or is it fine because because the default memory order (memory_order_seq_cst) on working_flag forces a fence?
 		messages->push_back({ ErrorSeverity::error, "Could not reserve temp file" });
-		if constexpr (extraFeatures) working_flag->store(false);
+		if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 		return;
 	}
 
@@ -352,7 +355,7 @@ void WriteArchive_internal(
 			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
-			working_flag->store(false);
+			working_flag->store(false, std::memory_order_release);
 			return;
 		}
 
@@ -362,7 +365,7 @@ void WriteArchive_internal(
 			for (auto& [header, f] : compressed_files_data) {
 				if (f) delete[] f;
 			}
-			if constexpr (extraFeatures) working_flag->store(false);
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 	}
@@ -395,7 +398,7 @@ void WriteArchive_internal(
 		// The pointer can only be nullptr if there was an error
 		delete[] compressed_files_data[i].second;
 	}
-	if constexpr (extraFeatures) working_flag->store(false);
+	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 }
 template void WriteArchive_internal<true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
