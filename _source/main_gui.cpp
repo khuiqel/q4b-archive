@@ -443,24 +443,35 @@ int main(int argc, char** argv)
 				}
 
 				if (ImGui::BeginTabItem("Q4B Unpacking & Inspecting")) {
-					ImGui::TextUnformatted("TODO");
+					ImGui::SeparatorText("Unpack Everything");
 
-					if (ImGui::Button("Preview Archive")) {
-						//TODO: select which ones to unpack
-					}
-
-					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+					if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+					ImGui::InputText("Archive name", archive_file_path, std::size(archive_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
 					ImGui::InputText("Output folder", output_file_path, std::size(output_file_path), ImGuiInputTextFlags_CallbackCharFilter, filepathCleaningFunc);
 					ImGui::PopItemWidth();
+					if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 
-					if (ImGui::Button("Decode Archive")) {
-						q4b::DecodeArchive(archive_file_path, output_file_path);
+					// if (!rootDirIsLocked) { ImGui::BeginDisabled(); } //TODO
+					if (THREAD_IS_WORKING) {
+						GuiCompressionProgressBar();
+					} else {
+						if (ImGui::Button("Unpack Archive")) {
+							gdata.messages.clear();
+							thread_files_completed.store(0);
+							thread_func_exit_early.store(false);
+							thread_func_working.store(true);
+							std::thread t(q4b::UnpackArchive_internal<true>, archive_file_path, output_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+							t.detach();
+						}
 					}
+					// ImGui::Button("Generate list for CLI (TODO)");
+					// if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 
 					if (ImGui::Button("Read Archive Header")) {
 						gdata.viewingArchiveFileList.clear();
-						q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
-						gdata.viewingArchive = true;
+						bool success = q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
+						gdata.viewingArchive = success;
 					}
 
 					//TODO: select these files for decompression

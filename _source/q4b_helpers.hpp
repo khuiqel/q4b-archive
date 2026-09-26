@@ -202,14 +202,54 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
 	WriteArchive_internal<false>(file_list, root_file_path, output, threadCount, messages, nullptr, nullptr, nullptr);
 }
 
-/* Decodes a Q4B archive.
+/* Internal function for decoding archives. Exits early if the input file is malformed, such as too
+ * small to hold all its reported data, or some other error when reading the input file. Will
+ * continue if the decompression encounters an error.
+ * Does not have a flag for signalling when it's done because it's not supposed to be used by itself.
+ *
+ * @return A list of the files decompressed, allocated using `new[]`, nullptr on failure.
+ */
+template <bool extraFeatures>
+std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
+	const std::filesystem::path& input,
+	std::vector<ErrorMessage>* messages,
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
+template <bool extraFeatures>
+void UnpackArchive_internal(const std::filesystem::path& input, const std::filesystem::path& output,
+                            std::vector<ErrorMessage>* messages,
+                            std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
+/* Unpacks a Q4B archive.
  *
  * @param input [in] Name of the archive.
- * @param output [in] Output folder of the archive.
+ * @param output [in] Output folder for the files.
+ * @param messages [out,optional] Accumulated error messages. (TODO)
+ * @param working_flag [out] Flag to signal if the function is still running.
+ * @param exit_flag [in] Flag to signal to the function if it should exit early.
+ * @param files_completed [out] Count of files compressed so far.
  *
  * @return void
  */
-void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept;
+inline void UnpackArchive(const std::filesystem::path& input, const std::filesystem::path& output,
+                          std::vector<ErrorMessage>* messages,
+                          std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	UnpackArchive_internal<true>(input, output, messages, working_flag, exit_flag, files_completed);
+}
+
+/* Unpacks a Q4B archive.
+ *
+ * @param input [in] Name of the archive.
+ * @param output [in] Output folder for the files.
+ * @param messages [out,optional] Accumulated error messages. (TODO)
+ *
+ * @return void
+ */
+inline void UnpackArchive(const std::filesystem::path& input, const std::filesystem::path& output,
+                          std::vector<ErrorMessage>* messages) noexcept {
+	UnpackArchive_internal<false>(input, output, messages, nullptr, nullptr, nullptr);
+}
 
 /* Reads the header of a Q4B archive.
  *

@@ -124,7 +124,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 
 		const CompressionFile& file = file_list[i];
 		void* file_data;
-		int64_t file_size = LoadFileIntoMemory(root_file_path / file.data.path, &file_data);
+		const int64_t file_size = LoadFileIntoMemory(root_file_path / file.data.path, &file_data);
 		if (file_size == -1) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.data.path).string() + "\"" });
 			compressed_files_data.push_back({ {}, nullptr });
@@ -409,7 +409,169 @@ template void WriteArchive_internal<false>(
 	int threadCount, std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
-void DecodeArchive(const std::filesystem::path& input, const std::filesystem::path& output) noexcept {
+template <bool extraFeatures>
+std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
+	const std::filesystem::path& input,
+	std::vector<ErrorMessage>* messages,
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
+	// Open file
+	std::ifstream archive(input, std::ios::binary | std::ios::ate);
+	if (!archive) {
+		messages->push_back({ ErrorSeverity::error, "Couldn't open archive" });
+		return {};
+	}
+	const int64_t archiveSize = archive.tellg();
+	if (archiveSize == -1) {
+		messages->push_back({ ErrorSeverity::error, "Couldn't open archive" });
+		return {};
+	}
+	archive.seekg(0, std::ios::beg);
+	if (!archive) {
+		messages->push_back({ ErrorSeverity::error, "Couldn't open archive" });
+		return {};
+	}
+
+	// Read archive header
+	if (archiveSize < sizeof(ArchiveHeader)) {
+		messages->push_back({ ErrorSeverity::error, "Archive is too small" });
+		return {};
+	}
+
+	ArchiveHeader ah;
+	archive.read((char*)(&ah), sizeof(ArchiveHeader));
+	int64_t bytesRead = archive.gcount();
+	if (!archive || bytesRead != sizeof(ArchiveHeader)) {
+		messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+		return {};
+	}
+	SwapEndiannessIfNeeded(ah);
+
+	if (!std::equal(ah.magic, ah.magic + sizeof(ah.magic), MAGIC_NUM)) {
+		messages->push_back({ ErrorSeverity::error, "Archive isn't a Q4B archive" });
+		return {};
+	}
+	if (!ah.verifyHash()) {
+		messages->push_back({ ErrorSeverity::error, "Archive hash was incorrect" });
+		// return {};
+	}
+	if (ah.num_files == 0) [[unlikely]] {
+		// Exit early
+		return {};
+	}
+
+	// Read file headers
+	std::vector<ArchivedFileHeader> headers(ah.num_files);
+	size_t file_offset = sizeof(ArchiveHeader);
+
+	for (int i = 0; i < ah.num_files; i++) {
+		if (archiveSize < file_offset + sizeof(ArchivedFileHeader)) {
+			messages->push_back({ ErrorSeverity::error, "Archive is too small for every file header" });
+			return {};
+		}
+
+		ArchivedFileHeader& file_header = headers[i];
+		archive.read((char*)(&file_header), sizeof(ArchivedFileHeader));
+		bytesRead = archive.gcount();
+		if (!archive || bytesRead != sizeof(ArchivedFileHeader)) {
+			messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+			return {};
+		}
+		SwapEndiannessIfNeeded(file_header);
+		file_offset += sizeof(ArchivedFileHeader);
+	}
+
+	// Decompress files
+	std::vector<std::pair<ArchivedFileHeader, void*>> decompressed_files_data; decompressed_files_data.reserve(ah.num_files);
+	for (int i = 0; i < ah.num_files; i++) {
+		if constexpr (extraFeatures)
+			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+				messages->push_back({ ErrorSeverity::info, "Quitting early" });
+				return decompressed_files_data;
+			}
+
+		if (archiveSize < file_offset + headers[i].compressed_size) {
+			messages->push_back({ ErrorSeverity::error, "Archive is too small for every compressed file" });
+			return decompressed_files_data;
+		}
+
+		void* compressedFile = new char[headers[i].compressed_size];
+		archive.read((char*)compressedFile, headers[i].compressed_size);
+		bytesRead = archive.gcount();
+		if (!archive || bytesRead != headers[i].compressed_size) {
+			messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+			delete[] compressedFile;
+			return decompressed_files_data;
+		}
+		file_offset += headers[i].compressed_size;
+
+		ArchivedFileHeader file_header;
+		std::memcpy(file_header.path, headers[i].path, Q4B_MAX_PATH);
+		file_header.compression_type = headers[i].compression_type;
+		file_header.compressed_size = headers[i].compressed_size;
+		file_header.flags = 0;
+
+		if (!file_header.pathIsValid()) {
+			messages->push_back({ ErrorSeverity::error, "Invalid path for file idx " + std::to_string(i) });
+		}
+
+		if (headers[i].compression_type == CompressionScheme::Uncompressed) {
+			file_header.uncompressed_size = file_header.compressed_size;
+			file_header.uncompressed_hash = file_header.compressed_hash = ComputeHash(compressedFile, file_header.uncompressed_size);
+			decompressed_files_data.push_back({ file_header, compressedFile });
+		} else {
+			CompressionSchemeFunctions* functions = SchemeToFunctions(headers[i].compression_type);
+			if (functions == nullptr) [[unlikely]] {
+				messages->push_back({ ErrorSeverity::error, "Unknown compression type for file \"" + std::string(headers[i].path) + "\"" });
+				decompressed_files_data.push_back({ {}, nullptr });
+				delete[] compressedFile;
+			} else {
+				void* outputData;
+				uint64_t decompressedSize;
+				decompressedSize = functions->Decompress(compressedFile, headers[i].compressed_size, &outputData, headers[i].uncompressed_size);
+				file_header.uncompressed_size = decompressedSize;
+
+				if (file_header.uncompressed_size != headers[i].uncompressed_size) {
+					messages->push_back({ ErrorSeverity::error, "Decompressed size doesn't match for \"" + std::string(headers[i].path) + "\"" });
+				} else {
+					file_header.uncompressed_hash = ComputeHash(outputData, file_header.uncompressed_size);
+					file_header.compressed_hash = ComputeHash(compressedFile, file_header.compressed_size);
+
+					if (file_header.compressed_hash != headers[i].compressed_hash) {
+						messages->push_back({ ErrorSeverity::error, "Compressed hash doesn't match for \"" + std::string(headers[i].path) + "\"" });
+					}
+					if (file_header.uncompressed_hash != headers[i].uncompressed_hash) {
+						messages->push_back({ ErrorSeverity::error, "Uncompressed hash doesn't match for \"" + std::string(headers[i].path) + "\"" });
+					}
+				}
+
+				decompressed_files_data.push_back({ file_header, outputData });
+
+				delete functions;
+				delete[] compressedFile;
+			}
+		}
+
+		if constexpr (extraFeatures) files_completed->fetch_add(1, std::memory_order_release);
+	}
+
+	return decompressed_files_data;
+}
+template std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal<true>(
+	const std::filesystem::path& input,
+	std::vector<ErrorMessage>* messages,
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal<false>(
+	const std::filesystem::path& input,
+	std::vector<ErrorMessage>* messages,
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+
+template <bool extraFeatures>
+void UnpackArchive_internal(
+	const std::filesystem::path& input, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
+
 	if (std::filesystem::exists(output)) {
 		if (!std::filesystem::is_directory(output)) {
 			return;
@@ -418,152 +580,119 @@ void DecodeArchive(const std::filesystem::path& input, const std::filesystem::pa
 		std::filesystem::create_directory(output);
 	}
 
-	size_t archive_size = std::filesystem::file_size(input);
-	if (archive_size < sizeof(ArchiveHeader)) {
-		return;
-	}
+	//TODO: should it return the expected number of files determined from the header?
+	auto decompressed_files_data = DecompressArchive_internal<true>(input, messages, exit_flag, files_completed);
 
-	void* archive;
-	int64_t file_size = LoadFileIntoMemory(input, &archive);
-	if (file_size == -1) {
-		//TODO
-		return;
-	}
-
-	ArchiveHeader ah;
-	std::memcpy(&ah, archive, sizeof(ArchiveHeader));
-	SwapEndiannessIfNeeded(ah);
-	if (!std::equal(ah.magic, ah.magic + sizeof(ah.magic), MAGIC_NUM)) {
-		delete[] archive;
-		return;
-	}
-	if (ah.num_files == 0) {
-		delete[] archive;
-		return;
-	}
-	if (!ah.verifyHash()) {
-		std::cout << "hash didn't match on header\n";
-		//return;
-	}
-	// if (ah.version <= 0) { return; } //TODO: versioning
-
-	std::vector<void*> compressed_files_data(ah.num_files);
-	std::vector<ArchivedFileHeader> compressed_files_headers(ah.num_files);
-	size_t file_offset = sizeof(ArchiveHeader);
-
-	for (int i = 0; i < ah.num_files; i++) {
-		if (archive_size < file_offset + sizeof(ArchivedFileHeader)) {
-			delete[] archive;
-			std::cout << "insufficient size for headers\n";
-			return;
-		}
-
-		ArchivedFileHeader& file_header = compressed_files_headers[i];
-		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
-		SwapEndiannessIfNeeded(file_header);
-		file_offset += sizeof(ArchivedFileHeader);
-	}
-
-	for (int i = 0; i < ah.num_files; i++) {
-		size_t compressed_size = compressed_files_headers[i].compressed_size;
-		if (archive_size < file_offset + compressed_size) {
-			delete[] archive;
-			for (int j = 0; j < i; j++) {
-				delete[] compressed_files_data[i];
+	if constexpr (extraFeatures)
+		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
+			messages->push_back({ ErrorSeverity::info, "Quitting early" });
+			for (auto& [header, f] : decompressed_files_data) {
+				if (f) delete[] f;
 			}
-			std::cout << "insufficient size for files\n";
+			working_flag->store(false, std::memory_order_release);
 			return;
 		}
 
-		compressed_files_data[i] = new char[compressed_size];
-		std::memcpy(compressed_files_data[i], (const char*)archive + file_offset, compressed_size);
-		file_offset += compressed_size;
-	}
-	// std::cout << "archive size: " << archive_size << " | file offset: " << file_offset << std::endl;
-
-	for (int i = 0; i < ah.num_files; i++) {
-		auto hash = ComputeHash(compressed_files_data[i], compressed_files_headers[i].compressed_size);
-		if (hash != compressed_files_headers[i].compressed_hash) {
-			delete[] archive;
-			for (void* f : compressed_files_data) {
-				delete[] f;
+	// Do not proceed further if there was an error
+	for (const auto& message : *messages) {
+		if (message.severity == ErrorSeverity::error) {
+			for (auto& [header, f] : decompressed_files_data) {
+				if (f) delete[] f;
 			}
-			// std::cout << "size: " << compressed_files_headers[i].compressed_size << " | hash stored: " << compressed_files_headers[i].compressed_hash << " | computed hash: " << hash << std::endl;
-			std::cout << "hash didn't match on file " << i << std::endl;
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
 	}
 
-	for (int i = 0; i < ah.num_files; i++) {
-		const ArchivedFileHeader& file_header = compressed_files_headers[i];
+	std::vector<std::string> filenames; filenames.reserve(decompressed_files_data.size());
+	for (auto& [header, f] : decompressed_files_data) {
+		if (f == nullptr) { continue; }
 
-		CompressionSchemeFunctions* functions = SchemeToFunctions(file_header.compression_type);
-		if (file_header.compression_type == CompressionScheme::Uncompressed) {
-			std::ofstream outfile(output / std::filesystem::path(file_header.path).filename(), std::ios::binary);
-			outfile.write((const char*)compressed_files_data[i], file_header.compressed_size);
-			outfile.close();
-			//TODO: should probably check hashes and size again, since the compressed_size could not equal the uncompressed size on ill-formatted data
-		} else if (functions == nullptr) {
-			std::cerr << "ERROR: Unknown compression: " << q4b::SchemeToDisplayStr(file_header.compression_type) << " (" << (uint32_t)file_header.compression_type << ")" << std::endl;
+		const std::string filename = std::filesystem::path(header.path).filename().string();
+		if (std::find(filenames.begin(), filenames.end(), filename) == filenames.end()) {
+			filenames.push_back(filename);
 		} else {
-			void* outputData;
-			uint64_t decompressedSize = functions->Decompress(compressed_files_data[i], file_header.compressed_size, &outputData, file_header.uncompressed_size);
-			delete functions;
-			if (decompressedSize != file_header.uncompressed_size) {
-				std::cout << "file size mismatch!\n";
-				//TODO
-			}
-			std::ofstream outfile(output / std::filesystem::path(file_header.path).filename(), std::ios::binary);
-			outfile.write((const char*)outputData, decompressedSize);
-			outfile.close();
+			messages->push_back({ ErrorSeverity::error, "Filename \"" + filename + "\" was already created" });
+			delete[] f;
+			continue;
 		}
 
-		// std::cout << "uncompressed " << i << "\n";
-	}
+		const std::filesystem::path output_path = output / filename;
+		std::ofstream outfile(output_path, std::ios::binary);
+		if (!outfile) {
+			messages->push_back({ ErrorSeverity::error, "Couldn't create \"" + output_path.string() + "\"" });
+			delete[] f;
+			continue;
+		}
 
-	std::cout << "unpacked .q4b\n";
+		outfile.write((const char*)f, header.uncompressed_size);
+		if (!outfile) {
+			messages->push_back({ ErrorSeverity::error, "Couldn't write to \"" + output_path.string() + "\"" });
+			delete[] f;
+			continue;
+		}
 
-	for (void* f : compressed_files_data) {
+		outfile.close();
 		delete[] f;
 	}
-	delete[] archive;
+	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 }
+template void UnpackArchive_internal<true>(
+	const std::filesystem::path& input, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+template void UnpackArchive_internal<false>(
+	const std::filesystem::path& input, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header, std::vector<ArchivedFileHeader>& list) noexcept {
-	size_t archive_size = std::filesystem::file_size(input);
-	if (archive_size < sizeof(ArchiveHeader)) {
+	// Open file
+	std::ifstream archive(input, std::ios::binary | std::ios::ate);
+	if (!archive) {
+		return false;
+	}
+	const int64_t archiveSize = archive.tellg();
+	if (archiveSize == -1) {
+		return false;
+	}
+	archive.seekg(0, std::ios::beg);
+	if (!archive) {
 		return false;
 	}
 
-	void* archive;
-	int64_t file_size = LoadFileIntoMemory(input, &archive); //TODO: no need to load the entire file...
-	if (file_size == -1) {
-		//TODO
+	// Read archive header
+	if (archiveSize < sizeof(ArchiveHeader)) {
 		return false;
 	}
-	if (file_size < sizeof(ArchiveHeader)) {
-		delete[] archive;
+
+	archive.read((char*)(&header), sizeof(ArchiveHeader));
+	int64_t bytesRead = archive.gcount();
+	if (!archive || bytesRead != sizeof(ArchiveHeader)) {
 		return false;
 	}
-	std::memcpy(&header, archive, sizeof(ArchiveHeader));
 	SwapEndiannessIfNeeded(header);
 
+	// Read file headers
+	std::vector<ArchivedFileHeader> headers(header.num_files);
 	size_t file_offset = sizeof(ArchiveHeader);
+
 	for (int i = 0; i < header.num_files; i++) {
-		if (archive_size < file_offset + sizeof(ArchivedFileHeader)) {
-			delete[] archive;
-			std::cout << "insufficient size for headers\n";
+		if (archiveSize < file_offset + sizeof(ArchivedFileHeader)) {
 			return false;
 		}
 
 		ArchivedFileHeader file_header;
-		std::memcpy(&file_header, (const char*)archive + file_offset, sizeof(ArchivedFileHeader));
+		archive.read((char*)(&file_header), sizeof(ArchivedFileHeader));
+		bytesRead = archive.gcount();
+		if (!archive || bytesRead != sizeof(ArchivedFileHeader)) {
+			return false;
+		}
 		SwapEndiannessIfNeeded(file_header);
 		list.push_back(file_header);
 		file_offset += sizeof(ArchivedFileHeader);
 	}
 
-	delete[] archive;
 	return true;
 }
 
@@ -576,7 +705,7 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) n
 
 	// Get file size: don't use std::filesystem::file_size because the size *could* change
 	//file.seekg(0, std::ios::end); // Not needed because the file was opened at the end
-	int64_t fileSize = file.tellg();
+	const int64_t fileSize = file.tellg();
 	if (fileSize == -1) {
 		return -1;
 	}
