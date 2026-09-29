@@ -189,19 +189,21 @@ add_executable(${PROJECT_GUI_NAME}
 	Externals/xxHash/xxhash.c
 )
 
-#TODO: is MSVC+Clang a special case?
-if (MSVC)
-	# Application icon:
+# Executable icon:
+if(WIN32)
 	target_sources(${PROJECT_GUI_NAME} PRIVATE ${PROJECT_NAME}.rc)
-	# Startup project:
-	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_GUI_NAME})
-	# Set the running directory to the source root:
-	set_target_properties(${PROJECT_NAME}     PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-	set_target_properties(${PROJECT_GUI_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-	# Disable the console window:
-	# TODO?: set_target_properties(${PROJECT_GUI_NAME} PROPERTIES WIN32_EXECUTABLE ON)
-	# target_link_options(${PROJECT_GUI_NAME} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif()
+# Visual Studio startup project:
+if(Q4B_DISABLE_GUI)
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+else()
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_GUI_NAME})
+endif()
+# Visual Studio running directory set to the source root:
+set_target_properties(${PROJECT_NAME}     PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+set_target_properties(${PROJECT_GUI_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+# Disable the console window:
+# set_target_properties(${PROJECT_GUI_NAME} PROPERTIES WIN32_EXECUTABLE ON)
 
 target_include_directories(${PROJECT_NAME}     PRIVATE Externals/CLI11/include)
 target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
@@ -230,9 +232,7 @@ add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 	Externals/xxHash/xxhash.c
 )
 
-if (MSVC)
-	set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-endif()
+set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
