@@ -448,7 +448,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
 	SwapEndiannessIfNeeded(ah);
 
 	if (!std::equal(ah.magic, ah.magic + sizeof(ah.magic), MAGIC_NUM)) {
-		messages->push_back({ ErrorSeverity::error, "Archive isn't a Q4B archive" });
+		messages->push_back({ ErrorSeverity::error, "File isn't a Q4B archive" });
 		return {};
 	}
 	if (!ah.verifyHash()) {
@@ -572,14 +572,24 @@ void UnpackArchive_internal(
 	std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
 
-	if (std::filesystem::exists(output)) {
-		if (!std::filesystem::is_directory(output)) {
+	// Create output directory
+	std::error_code ec;
+	if (std::filesystem::exists(output, ec)) {
+		if (!std::filesystem::is_directory(output, ec)) {
+			messages->push_back({ ErrorSeverity::error, "Output directory is not a directory" });
 			return;
 		}
+	} else if (ec) {
+		messages->push_back({ ErrorSeverity::error, "Filesystem error" });
+		return;
 	} else {
-		std::filesystem::create_directory(output);
+		if (!std::filesystem::create_directory(output, ec)) {
+			messages->push_back({ ErrorSeverity::error, "Could not create output directory" });
+			return;
+		}
 	}
 
+	// Unpack
 	//TODO: should it return the expected number of files determined from the header?
 	auto decompressed_files_data = DecompressArchive_internal<true>(input, messages, exit_flag, files_completed);
 
@@ -604,6 +614,7 @@ void UnpackArchive_internal(
 		}
 	}
 
+	// Write files
 	std::vector<std::string> filenames; filenames.reserve(decompressed_files_data.size());
 	for (auto& [header, f] : decompressed_files_data) {
 		if (f == nullptr) { continue; }
