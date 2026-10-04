@@ -55,7 +55,7 @@ struct CompressionSchemeInfo_Uncompressed final : public CompressionSchemeInfo {
 		informationText = "No compression scheme.";
 
 		helpText = "TODO";
-		searchNames = { "Uncompressed", "uncompressed", "none", "" };
+		searchNames = { "Uncompressed", "uncompressed", "none" };
 		fileExtensions = { ".uncompressed" };
 	}
 	void Initialize_Gui() override;

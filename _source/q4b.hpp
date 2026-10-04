@@ -21,7 +21,7 @@ inline constexpr uint32_t Q4B_VERSION_GEN(int major, int minor) {
 	return major*1000 + minor;
 }
 
-constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 0);
+constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 1);
 constexpr int Q4B_MAX_PATH = 256;
 constexpr char MAGIC_NUM[8] = "Q4B_YAY";
 
@@ -32,16 +32,19 @@ enum class CompressionScheme : uint32_t {
 	zstd_dict,
 	CountNormal,
 
-	CountExtraStart = 1000, // Schemes after this are not used by P3A
+	CountExtraStart = 10'000, // Schemes after this are not used by P3A
+	lz4_dict,
 	brotli,
 	snappy,
+	zlib,
 	lzma,
 	bzip2,
-	zlib, //implemented using miniz
-	lz4_dict,
+	gzip,
 	stb,
 	//OpenZL, //https://github.com/facebook/openzl
 	CountExtraEnd,
+
+	Invalid = 0xFFFFFFFF
 };
 
 constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
