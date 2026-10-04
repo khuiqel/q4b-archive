@@ -1,9 +1,11 @@
 #include "q4b_helpers.hpp"
 
 #include <algorithm>
+#include <charconv> // std::from_chars
 #include <cstring> // memcpy
 #include <fstream>
 #include <iostream>
+#include <sstream> // std::istringstream
 
 namespace q4b {
 
@@ -791,22 +793,31 @@ const char* SchemeToDisplayStr(CompressionScheme scheme) {
 	return "Unknown";
 }
 
-void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) {
+void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) noexcept {
 	std::ifstream f(input);
 	std::string line;
 	while (std::getline(f, line)) {
-		size_t pos_start, pos_end;
-		pos_start = line.find_first_of(" ");
-		std::string filename = line.substr(0, pos_start);
-		pos_end = line.find_first_of(" ", pos_start+1);
-		std::string scheme = line.substr(pos_start+1, pos_end - pos_start - 1);
-		pos_start = pos_end;
-		pos_end = line.find_first_of(" ", pos_start+1);
-		std::string level = line.substr(pos_start+1, pos_end - pos_start - 1);
+		if (line.empty()) [[unlikely]] {
+			continue;
+		}
+
+		std::istringstream iss(line);
+		std::string filename, scheme, level;
+
+		iss >> filename >> scheme >> level;
 
 		CompressionScheme s;
-		StrToScheme(scheme, &s);
-		file_list.push_back({ filename, s, std::stoi(level) });
+		if (StrToScheme(scheme, &s)) {
+			s = CompressionScheme::Invalid;
+		}
+
+		int l;
+		std::from_chars_result res = std::from_chars(level.data(), level.data() + level.size(), l);
+		if (res.ec != std::errc()) {
+			l = -1;
+		}
+
+		file_list.push_back({ filename, s, l });
 	}
 }
 

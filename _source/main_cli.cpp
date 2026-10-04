@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <climits> // INT_MAX
+#include <charconv> // std::from_chars
 #include <chrono>
 #include "q4b_helpers.hpp"
 #include "app/compression_info.hpp"
@@ -145,14 +146,14 @@ int main(int argc, char** argv) {
 		}
 
 		int level;
-		if (scheme == q4b::CompressionScheme::zstd) {
-			if (LEVEL == "max" || LEVEL == "--max" || LEVEL == "MAX") {
-				level = INT_MAX;
-			} else {
-				level = std::stoi(LEVEL);
-			}
+		if (scheme == q4b::CompressionScheme::zstd && (LEVEL == "max" || LEVEL == "--max" || LEVEL == "MAX")) {
+			level = INT_MAX;
 		} else {
-			level = std::stoi(LEVEL);
+			std::from_chars_result res = std::from_chars(LEVEL.data(), LEVEL.data() + LEVEL.size(), level);
+			if (res.ec != std::errc()) {
+				//TODO
+				level = -1;
+			}
 		}
 
 		void* compressed_file_data;

@@ -413,20 +413,43 @@ TEST(WriteArchive, TwoFilesCompressedLz4AndZstd) {
 TEST(Others, ConvertTextToFileList) {
 	std::vector<q4b::CompressionFile> files;
 	q4b::ReadArchiveInputFile(TEST_LIST_FILE, files);
-	ASSERT_TRUE(files.size() == 2);
+	ASSERT_TRUE(files.size() == 7);
 
-	const std::string path1 = files[0].data.path;
-	const std::string path2 = files[1].data.path;
-	EXPECT_TRUE(path1 == TEST_FILE.generic_string());
-	EXPECT_TRUE(path2 == TEST_FILE.generic_string());
+	for (const auto& f : files) {
+		const std::string path = f.data.path;
+		EXPECT_TRUE(path == TEST_FILE.generic_string());
+	}
 
 	EXPECT_TRUE(files[0].data.compression_type == q4b::CompressionScheme::lz4);
 	EXPECT_TRUE(files[0].compression_level == 1);
 	EXPECT_TRUE(files[0].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	EXPECT_TRUE(files[1].data.compression_type == q4b::CompressionScheme::zstd);
-	EXPECT_TRUE(files[1].compression_level == 3);
+	EXPECT_TRUE(files[1].compression_level == -1); // Too big
 	EXPECT_TRUE(files[1].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	EXPECT_TRUE(files[2].data.compression_type == q4b::CompressionScheme::brotli);
+	EXPECT_TRUE(files[2].compression_level == 5); // Handle extra words
+	EXPECT_TRUE(files[2].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	EXPECT_TRUE(files[3].data.compression_type == q4b::CompressionScheme::snappy);
+	EXPECT_TRUE(files[3].compression_level == -7); // Don't fix negative values
+	EXPECT_TRUE(files[3].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	EXPECT_TRUE(files[4].data.compression_type == q4b::CompressionScheme::stb);
+	EXPECT_TRUE(files[4].compression_level == -1); // Set to -1 if not present
+	EXPECT_TRUE(files[4].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	// Skip the empty line
+	EXPECT_FALSE(std::string(files[5].data.path).empty());
+
+	EXPECT_TRUE(files[5].data.compression_type == q4b::CompressionScheme::Invalid); // Unknown scheme
+	EXPECT_TRUE(files[5].compression_level == -1);
+	EXPECT_TRUE(files[5].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	EXPECT_TRUE(files[6].data.compression_type == q4b::CompressionScheme::Invalid); // No scheme
+	EXPECT_TRUE(files[6].compression_level == -1);
+	EXPECT_TRUE(files[6].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 }
 #endif
 

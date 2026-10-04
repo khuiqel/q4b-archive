@@ -282,7 +282,7 @@ std::string SchemeToFileExt(q4b::CompressionScheme scheme);
 // Returns "Unknown" for unknown/disabled schemes
 const char* SchemeToDisplayStr(CompressionScheme scheme);
 
-/* Reads a text file containing files to be compressed. Intended for the CLI.
+/* Reads a text file containing files to be compressed. Intended for the CLI. Does not check if the filepath is valid.
  *
  * @param input [in] The text file. Format is "filename scheme level" per line. (TODO: support spaces in filename, also zstd --max... maybe this function just splits on spaces?)
  * @param file_list [out] Output file list.
@@ -290,6 +290,6 @@ const char* SchemeToDisplayStr(CompressionScheme scheme);
  * @return void
  * TODO: errors
  */
-void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list);
+void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) noexcept;
 
 } // namespace q4b

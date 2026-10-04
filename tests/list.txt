@@ -1,2 +1,8 @@
 res/NotoSans-Regular.ttf lz4 1
-res/NotoSans-Regular.ttf zstd 3
+res/NotoSans-Regular.ttf zstd 33333333333333333333333333333333333333
+res/NotoSans-Regular.ttf brotli 5 more words
+res/NotoSans-Regular.ttf snappy -7
+res/NotoSans-Regular.ttf stb
+
+res/NotoSans-Regular.ttf invalid 
+res/NotoSans-Regular.ttf
