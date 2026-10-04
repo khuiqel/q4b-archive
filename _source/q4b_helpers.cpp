@@ -1,7 +1,7 @@
 #include "q4b_helpers.hpp"
 
 #include <algorithm>
-#include <cstring> //memcpy
+#include <cstring> // memcpy
 #include <fstream>
 #include <iostream>
 
@@ -170,6 +170,10 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 					file_header.compressed_hash = ComputeHash(outputData, file_header.compressed_size);
 				}
 				compressed_files_data.push_back({ file_header, outputData });
+
+				if (compressedSize > file_size) [[unlikely]] {
+					messages->push_back({ ErrorSeverity::warn, "File \"" + (root_file_path / file.data.path).string() + "\" is larger than its original size" });
+				}
 
 				delete functions;
 				delete[] file_data;
@@ -591,7 +595,7 @@ void UnpackArchive_internal(
 
 	// Unpack
 	//TODO: should it return the expected number of files determined from the header?
-	auto decompressed_files_data = DecompressArchive_internal<true>(input, messages, exit_flag, files_completed);
+	auto decompressed_files_data = DecompressArchive_internal<extraFeatures>(input, messages, exit_flag, files_completed);
 
 	if constexpr (extraFeatures)
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
@@ -745,7 +749,6 @@ int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) n
 	// No need to call file.close() because fstream destructors close automatically
 }
 
-// Returns 1 on failure, sets scheme on success
 int ExtToScheme(const std::string& FILE_EXT, CompressionScheme* scheme) {
 	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
 		for (const auto& ext : info->fileExtensions) {
@@ -755,11 +758,9 @@ int ExtToScheme(const std::string& FILE_EXT, CompressionScheme* scheme) {
 			}
 		}
 	}
-	std::cerr << "ERROR: could not determine scheme\n";
 	return 1;
 }
 
-// Returns 1 on failure, sets scheme on success
 int StrToScheme(const std::string& SCHEME, CompressionScheme* scheme) {
 	for (const CompressionSchemeInfo* info : SCHEME_INFO) {
 		for (const auto& name : info->searchNames) {
@@ -769,7 +770,6 @@ int StrToScheme(const std::string& SCHEME, CompressionScheme* scheme) {
 			}
 		}
 	}
-	std::cerr << "ERROR: unknown scheme\n";
 	return 1;
 }
 

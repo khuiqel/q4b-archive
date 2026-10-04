@@ -18,29 +18,29 @@ extern CompressionSchemeInfo* SCHEME_INFO[ENABLED_SCHEMES_COUNT];
 struct CompressionFile {
 	ArchivedFileHeader data;
 	int32_t compression_level;
-	uint32_t compression_flags;
+	Q4B_CompressionFileFlags compression_flags;
 
 	inline const char* getFilepath() const {
 		return data.path;
 	}
 
-	inline void setFlag(Q4B_CompressionFileFlags flag) { compression_flags |= static_cast<uint32_t>(flag); }
-	inline void unsetFlag(Q4B_CompressionFileFlags flag) { compression_flags &= ~static_cast<uint32_t>(flag); }
-	inline bool getFlag(Q4B_CompressionFileFlags flag) const { return compression_flags & static_cast<uint32_t>(flag); }
+	inline void setFlag(Q4B_CompressionFileFlags flag) { compression_flags = static_cast<Q4B_CompressionFileFlags>(compression_flags | flag); }
+	inline void unsetFlag(Q4B_CompressionFileFlags flag) { compression_flags = static_cast<Q4B_CompressionFileFlags>(static_cast<uint32_t>(compression_flags) & ~static_cast<uint32_t>(flag)); }
+	inline bool getFlag(Q4B_CompressionFileFlags flag) const { return compression_flags & flag; }
 
 	CompressionFile() {
 		data.setPath("");
 		data.compression_type = CompressionScheme::Uncompressed;
 		data.flags = 0;
 		compression_level = 0;
-		compression_flags = 0;
+		compression_flags = Q4B_CompressionFileFlags::None;
 	}
 	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
 		data.setPath(file.string());
 		data.compression_type = compression_type_;
 		data.flags = 0;
 		compression_level = compression_level_;
-		compression_flags = 0;
+		compression_flags = Q4B_CompressionFileFlags::None;
 	}
 };
 

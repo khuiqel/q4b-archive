@@ -1,5 +1,5 @@
 #include "compression_data.hpp"
-#include <climits> //INT_MAX
+#include <climits> // INT_MAX
 #include <iostream>
 
 #ifdef Q4B_ENABLE_LZ4

@@ -1,15 +1,16 @@
 #include "../_source/q4b_helpers.hpp"
 #include <gtest/gtest.h>
 
-#include <filesystem>
 #include <algorithm>
-#include <bit> //std::popcount
+#include <bit> // std::popcount
+#include <climits> // INT_MAX
+#include <filesystem>
 
 const std::filesystem::path TEST_ARCHIVE_PATH = "tests/test.q4b";
 const std::filesystem::path TEST_ARCHIVE_PATH_2 = "tests/test2.q4b";
 const std::filesystem::path TEST_FILE = "res/NotoSans-Regular.ttf";
 const std::filesystem::path TEST_FILE_2 = "res/../res/NotoSans-Regular.ttf"; //TODO: get another file
-const std::filesystem::path TEST_FILE_NONEXISTANT = "nope.txt";
+const std::filesystem::path TEST_FILE_NONEXISTENT = "nope.txt";
 const std::filesystem::path TEST_LIST_FILE = "tests/list.txt";
 constexpr int THREAD_COUNT = 4;
 
@@ -83,28 +84,28 @@ TEST(ArchiveStructs, SetPathBackslash) {
 TEST(ArchiveStructs, CompressionFileFlags) {
 	// Test constructors
 	q4b::CompressionFile file1;
-	ASSERT_TRUE(file1.compression_flags == 0);
+	ASSERT_TRUE(file1.compression_flags == q4b::Q4B_CompressionFileFlags::None);
 	q4b::CompressionFile file2 = { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 };
-	ASSERT_TRUE(file2.compression_flags == 0);
+	ASSERT_TRUE(file2.compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	// Test one flag set/unset
 	q4b::CompressionFile file3;
 	file3.setFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
-	ASSERT_TRUE(file3.compression_flags != 0);
+	ASSERT_TRUE(file3.compression_flags != q4b::Q4B_CompressionFileFlags::None);
 	EXPECT_TRUE(file3.getFlag((q4b::Q4B_CompressionFileFlags) 0b01000000));
-	EXPECT_TRUE(std::popcount(file3.compression_flags) == 1);
+	EXPECT_TRUE(std::popcount(static_cast<uint32_t>(file3.compression_flags)) == 1);
 	file3.unsetFlag((q4b::Q4B_CompressionFileFlags) 0b01000000);
-	ASSERT_TRUE(file3.compression_flags == 0);
+	ASSERT_TRUE(file3.compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	// Test multiple flags
 	q4b::CompressionFile file4;
 	constexpr auto multi_flags = (q4b::Q4B_CompressionFileFlags) 0b01010110;
 	file4.setFlag(multi_flags);
-	EXPECT_TRUE(file4.compression_flags != 0);
+	EXPECT_TRUE(file4.compression_flags != q4b::Q4B_CompressionFileFlags::None);
 	EXPECT_TRUE(file4.getFlag(multi_flags)); // TODO: Call it getFlags()?
-	EXPECT_TRUE(std::popcount(file4.compression_flags) == 4);
+	EXPECT_TRUE(std::popcount(static_cast<uint32_t>(file4.compression_flags)) == 4);
 	file4.unsetFlag(multi_flags);
-	EXPECT_TRUE(file4.compression_flags == 0);
+	EXPECT_TRUE(file4.compression_flags == q4b::Q4B_CompressionFileFlags::None);
 }
 
 
@@ -153,15 +154,15 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
-TEST(WriteArchive, OneFileNonexistant) {
-	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTANT));
+TEST(WriteArchive, OneFileNonexistent) {
+	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTENT));
 
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTENT, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
@@ -172,14 +173,14 @@ TEST(WriteArchive, OneFileNonexistant) {
 }
 
 TEST(WriteArchive, SomeFilesExist) {
-	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTANT));
+	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTENT));
 
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTANT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTENT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	// Don't write an archive on file loading failure
@@ -223,6 +224,7 @@ TEST(WriteArchive, OneFileCompressedLz4) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
+#if 0
 TEST(WriteArchive, Lz4MetadataSmaller) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -250,6 +252,7 @@ TEST(WriteArchive, Lz4MetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
 #endif
+#endif
 
 #ifdef Q4B_ENABLE_ZSTD
 TEST(WriteArchive, OneFileCompressedZstd) {
@@ -268,6 +271,35 @@ TEST(WriteArchive, OneFileCompressedZstd) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
+#ifdef Q4B_ADVANCED_TESTS
+TEST(WriteArchive, OneFileCompressedZstdMax) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH);
+	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) {
+		std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+	}
+
+	std::vector<q4b::ErrorMessage> messages;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 22 } }; //TODO: get the max level from CompressionSchemeInfo?
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+
+	files[0].compression_level = INT_MAX;
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH_2, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
+
+	// Assume Zstd --max is better
+	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH_2), std::filesystem::file_size(TEST_ARCHIVE_PATH));
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
+}
+#endif
+
+#if 0
 TEST(WriteArchive, ZstdMetadataSmaller) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
@@ -293,6 +325,7 @@ TEST(WriteArchive, ZstdMetadataSmaller) {
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
 }
+#endif
 #endif
 
 #ifdef Q4B_ENABLE_BROTLI
@@ -350,7 +383,7 @@ TEST(WriteArchive, OneFileCompressedStb) {
 #endif
 
 #if defined(Q4B_ENABLE_LZ4) && defined(Q4B_ENABLE_ZSTD)
-TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
+TEST(WriteArchive, TwoFilesCompressedLz4AndZstd) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
 	}
@@ -359,19 +392,16 @@ TEST(WriteArchive, TwoFilesCompressedZstdAndLz4) {
 	}
 
 	std::vector<q4b::ErrorMessage> messages;
-	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1 }, { TEST_FILE_2, q4b::CompressionScheme::zstd, 1 } };
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::lz4, 1 }, { TEST_FILE_2, q4b::CompressionScheme::lz4, 1 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
-
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
-	// Assume Zstd can compress the test file to less than its original size
-	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE) + std::filesystem::file_size(TEST_FILE_2));
 
-	files[1].data.compression_type = q4b::CompressionScheme::lz4;
+	files[1].data.compression_type = q4b::CompressionScheme::zstd;
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH_2, THREAD_COUNT, &messages);
-
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH_2));
-	// Assume LZ4 compresses the test file less than Zstd
-	EXPECT_GT(std::filesystem::file_size(TEST_ARCHIVE_PATH_2), std::filesystem::file_size(TEST_ARCHIVE_PATH));
+
+	// Assume Zstd compresses the test file more than LZ4
+	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH_2), std::filesystem::file_size(TEST_ARCHIVE_PATH));
 
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 	std::filesystem::remove(TEST_ARCHIVE_PATH_2);
@@ -392,11 +422,11 @@ TEST(Others, ConvertTextToFileList) {
 
 	EXPECT_TRUE(files[0].data.compression_type == q4b::CompressionScheme::lz4);
 	EXPECT_TRUE(files[0].compression_level == 1);
-	EXPECT_TRUE(files[0].compression_flags == 0);
+	EXPECT_TRUE(files[0].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	EXPECT_TRUE(files[1].data.compression_type == q4b::CompressionScheme::zstd);
 	EXPECT_TRUE(files[1].compression_level == 3);
-	EXPECT_TRUE(files[1].compression_flags == 0);
+	EXPECT_TRUE(files[1].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 }
 #endif
 

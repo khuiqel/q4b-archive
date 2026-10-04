@@ -2,7 +2,7 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 #include <fstream>
-#include <climits> //INT_MAX
+#include <climits> // INT_MAX
 #include <chrono>
 #include "q4b_helpers.hpp"
 #include "app/compression_info.hpp"
@@ -81,7 +81,8 @@ int main(int argc, char** argv) {
 		std::vector<q4b::CompressionFile> file_list;
 		q4b::ReadArchiveInputFile(FILES, file_list);
 
-		q4b::DecodeArchive(ARCHIVE, OUTPUT_DIR);
+		std::vector<q4b::ErrorMessage> messages;
+		q4b::UnpackArchive(ARCHIVE, OUTPUT_DIR, &messages);
 
 	} else if (subcom == subcom_inspect) {
 
@@ -126,7 +127,10 @@ int main(int argc, char** argv) {
 		q4b::CompressionScheme scheme;
 		int ret;
 		ret = q4b::StrToScheme(SCHEME, &scheme);
-		if (ret) { return 1; }
+		if (ret) {
+			std::cerr << "ERROR: unknown scheme\n";
+			return 1;
+		}
 
 		if (scheme == q4b::CompressionScheme::Uncompressed) {
 			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
@@ -134,7 +138,8 @@ int main(int argc, char** argv) {
 		}
 
 		CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
-		if (functions == nullptr) {
+		if (functions == nullptr) [[unlikely]] {
+			// If the info and function arrays are synchronized, this shouldn't happen
 			std::cerr << "ERROR: unsupported scheme\n";
 			return 1;
 		}
@@ -197,10 +202,17 @@ int main(int argc, char** argv) {
 		int ret;
 		if (SCHEME == "") {
 			ret = q4b::ExtToScheme(std::filesystem::path(INPUT).extension().string(), &scheme);
+			if (ret) {
+				std::cerr << "ERROR: could not determine scheme\n";
+				return 1;
+			}
 		} else {
 			ret = q4b::StrToScheme(SCHEME, &scheme);
+			if (ret) {
+				std::cerr << "ERROR: unknown scheme\n";
+				return 1;
+			}
 		}
-		if (ret) { return 1; }
 
 		if (scheme == q4b::CompressionScheme::Uncompressed) {
 			std::cerr << "ERROR: file is uncompressed, nothing to do\n";

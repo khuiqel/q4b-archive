@@ -28,12 +28,21 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 	* Linux: install [SDL dependencies](https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md)
 	* Only uses SDL's Video and Render subsystems; Joystick can be enabled if you want to use a gamepad to navigate the GUI. GPU is not needed.
 	* The `CMakeLists.txt` file sets the instruction set to SSE4.2 by default. If your CPU doesn't have that, change it.
-	* C++23 is not strictly needed... definitely requires C++17 for `<filesystem>`, but you could probably add a [replacement library](https://github.com/gulrak/filesystem) given enough time if you want to go earlier. The tests do require C++23 (or honestly C++20).
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
-	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, and GoogleTest for the tests.
+	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, GoogleTest for the tests, and xxHash (for archives).
 	* **If you want to use stb_compress with MinGW, run this:** `git apply Externals/_patches/0001-stb-fix-defines.patch`
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
+
+### CMake options
+
+| Option | Default | Explanation | Notes |
+| ------ | ----------- | ------- | ----- |
+| `Q4B_BUILD_TESTS`    | ON  | Build the tests | |
+| `Q4B_ADVANCED_TESTS` | OFF | Enable advanced tests | Currently only adds testing `zstd --max` |
+| `Q4B_ENABLE_GUI`     | ON  | Enables building the GUI | |
+
+Scheme options (all default ON): `Q4B_ENABLE_LZ4`, `Q4B_ENABLE_ZSTD`, `Q4B_ENABLE_BROTLI`, `Q4B_ENABLE_SNAPPY`, `Q4B_ENABLE_STB`
 
 ### Linux
 
@@ -90,11 +99,12 @@ Windows:
 
 ## Benchmarking Utility
 
-Test out the various compression schemes, comparing the compression time vs. size! Outputs a CSV, or can generate a plot if you have `matplotlib`.
+The benchmark utility is a Python script, so just run it. It requires the CLI program to have been built. Parameter order: `<path to q4b.exe> [-o decompression_dir] input_file run_count [-warm] [formats ...]`
 
-![example graph](benchmark-example.png)
-
-(Note: LZ4 generic decompression currently doesn't work...)
+* Add `-o dir` to also test decompression speed
+* Add `-warm` to do one extra run and throw out the first result, because it was probably a cold run
+* `formats` is pairs of schemes and levels. Examples: `lz4 9 zstd 3-19 brotli 0,11 snappy 1 stb 0`
+* Specify `-p` as one of `print csv plot` for how to output the data, and `-pout` for the output filename. Plots require matplotlib (TODO).
 
 ## Big features remaining
 

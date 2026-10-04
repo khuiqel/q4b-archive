@@ -1,5 +1,5 @@
 #include "compression_info.hpp"
-#include <climits> //INT_MAX
+#include <climits> // INT_MAX
 
 void CompressionSchemeInfo_Uncompressed::Initialize_Gui() {
 	char* str = new char[2];

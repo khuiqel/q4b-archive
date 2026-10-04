@@ -1,7 +1,7 @@
 #include "q4b.hpp"
 
 #include <algorithm>
-#include <cstring> //memcpy
+#include <cstring> // memcpy
 
 namespace q4b {
 

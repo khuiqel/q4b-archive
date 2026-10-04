@@ -1,5 +1,5 @@
 #include "gui_data.hpp"
-#include <thread> //hardware_concurrency
+#include <thread> // std::hardware_concurrency
 
 int GuiData::threadCountMax = 1;
 

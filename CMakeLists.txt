@@ -10,9 +10,10 @@ option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
 option(Q4B_ENABLE_SNAPPY "Enable Snappy compression and decompression" ON)
 option(Q4B_ENABLE_STB    "Enable stb_compress compression and decompression" ON)
 set(Q4B_SCHEME_LIBS)
+
 option(Q4B_BUILD_TESTS    "Build tests" ON)
-option(Q4B_DISABLE_GUI    "Disables building the GUI" OFF)
-option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF)
+option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF) # Currently only adds testing zstd --max
+option(Q4B_ENABLE_GUI     "Enables building the GUI" ON)
 
 set(CMAKE_CXX_STANDARD 23) # C++23 requires CMake 3.20
 set(CMAKE_CXX_STANDARD_REQUIRED False)
@@ -25,22 +26,22 @@ if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	# TODO
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	# TODO
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	# Note: specifying --parallel on the command line is probably better practice,
-	# but then Visual Studio wouldn't get the /MP flag
-	add_compile_options(/MP)
-else()
-	message(WARNING "Unknown compiler, assuming it's fine...")
-endif()
-
 # Global CMake configuration
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-# Set instruction level
+# General compiler flags
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	# Note: specifying --parallel on the command line is probably better practice,
+	# but then Visual Studio wouldn't get the /MP flag
+	add_compile_options(/MP)
+	# Make MSVC behave like everyone else:
+	add_compile_options(/Zc:__cplusplus)
+	add_compile_options(/volatile:iso)
+else()
+	#TODO
+endif()
+
+# Instruction set
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(COMPILER_MARCH_FLAGS "/arch:SSE4.2")
 	# ARM: /arch:armv8.1 (8.0 is the default)
@@ -70,7 +71,7 @@ endif()
 set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} ${COMPILER_MARCH_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMPILER_MARCH_FLAGS}")
 
-if(NOT Q4B_DISABLE_GUI)
+if(Q4B_ENABLE_GUI)
 	set(SDL_AUDIO    OFF CACHE BOOL "" FORCE)
 	set(SDL_VIDEO    ON  CACHE BOOL "" FORCE)
 	set(SDL_GPU      OFF CACHE BOOL "" FORCE) # Needed by ImGui (for GPU-accelerated backends)
@@ -173,7 +174,6 @@ add_executable(${PROJECT_NAME}
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
 	_source/main_cli.cpp
-
 	Externals/xxHash/xxhash.c
 )
 
@@ -184,7 +184,6 @@ add_executable(${PROJECT_GUI_NAME}
 	_source/q4b_helpers.cpp
 	_source/gui_data.cpp
 	_source/main_gui.cpp
-
 	${IMGUI_FILES}
 	Externals/xxHash/xxhash.c
 )
@@ -194,7 +193,7 @@ if(WIN32)
 	target_sources(${PROJECT_GUI_NAME} PRIVATE ${PROJECT_NAME}.rc)
 endif()
 # Visual Studio startup project:
-if(Q4B_DISABLE_GUI)
+if(Q4B_ENABLE_GUI)
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 else()
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_GUI_NAME})
@@ -222,13 +221,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(Externals/googletest EXCLUDE_FROM_ALL)
 
 add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
-	tests/archive.cpp
-
 	_source/app/compression_info.cpp
 	_source/lib/compression_data.cpp
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-
+	tests/archive.cpp
 	Externals/xxHash/xxhash.c
 )
 
@@ -236,6 +233,10 @@ set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIREC
 
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
 target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
+
+if(Q4B_ADVANCED_TESTS)
+	target_compile_definitions(${PROJECT_TESTS_NAME} Q4B_ADVANCED_TESTS=1)
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(${PROJECT_TESTS_NAME})
