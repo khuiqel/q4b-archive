@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
+		q4b::CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
 		if (functions == nullptr) [[unlikely]] {
 			// If the info and function arrays are synchronized, this shouldn't happen
 			std::cerr << "ERROR: unsupported scheme\n";
@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 
-		CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
+		q4b::CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
 		if (functions == nullptr) {
 			std::cerr << "ERROR: unsupported scheme\n";
 			return 1;

@@ -6,6 +6,8 @@
 #include <lz4hc.h>
 #include <lz4frame.h>
 
+namespace q4b {
+
 uint64_t CompressionSchemeFunctions_Lz4::GetMaxSize() const {
 	//TODO
 	return LZ4_MAX_INPUT_SIZE;
@@ -93,9 +95,13 @@ CompressionSchemeFunctions_Lz4::~CompressionSchemeFunctions_Lz4() {
 }
 #endif
 
+} // namespace q4b
+
 #ifdef Q4B_ENABLE_ZSTD
 #define ZSTD_STATIC_LINKING_ONLY
 #include <zstd.h>
+
+namespace q4b {
 
 uint64_t CompressionSchemeFunctions_Zstd::GetMaxSize() const {
 	return INT64_MAX;
@@ -184,9 +190,13 @@ CompressionSchemeFunctions_Zstd::~CompressionSchemeFunctions_Zstd() {
 }
 #endif
 
+} // namespace q4b
+
 #ifdef Q4B_ENABLE_BROTLI
 #include <brotli/encode.h>
 #include <brotli/decode.h>
+
+namespace q4b {
 
 uint64_t CompressionSchemeFunctions_Brotli::GetMaxSize() const {
 	return INT64_MAX;
@@ -224,8 +234,12 @@ CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
 }
 #endif
 
+} // namespace q4b
+
 #ifdef Q4B_ENABLE_SNAPPY
 #include <snappy.h>
+
+namespace q4b {
 
 uint64_t CompressionSchemeFunctions_Snappy::GetMaxSize() const {
 	return UINT32_MAX;
@@ -263,9 +277,13 @@ CompressionSchemeFunctions_Snappy::~CompressionSchemeFunctions_Snappy() {
 }
 #endif
 
+} // namespace q4b
+
 #ifdef Q4B_ENABLE_STB
 #define STB_DEFINE
 #include <deprecated/stb.h>
+
+namespace q4b {
 
 uint64_t CompressionSchemeFunctions_Stb::GetMaxSize() const {
 	//TODO: real limit is 4GB?
@@ -301,3 +319,5 @@ CompressionSchemeFunctions_Stb::~CompressionSchemeFunctions_Stb() {
 	//TODO?
 }
 #endif
+
+} // namespace q4b

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include "../q4b.hpp"
 
+namespace q4b {
+
 struct CompressionSchemeFunctions {
 	// TODO: should core info get duplicated?
 
@@ -79,3 +81,5 @@ struct CompressionSchemeFunctions_Stb final : public CompressionSchemeFunctions 
 	~CompressionSchemeFunctions_Stb();
 };
 #endif
+
+} // namespace q4b

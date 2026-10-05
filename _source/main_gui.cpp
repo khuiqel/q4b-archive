@@ -151,12 +151,12 @@ int main(int argc, char** argv)
 	ret = ImGuiHelpers::LoadPNGFromFile("res/glowing-star_1f31f.png",       renderer, &recommended_best);
 	ret = ImGuiHelpers::LoadPNGFromFile("res/white-question-mark_2754.png", renderer, &recommended_noopinion);
 
-	const std::unordered_map<CompressionSchemeRecommendedLevel, SDL_Texture*> recommendationStr_toTexId = {
-		{ CompressionSchemeRecommendedLevel::Awful, recommended_awful },
-		{ CompressionSchemeRecommendedLevel::Okay, recommended_okay },
-		{ CompressionSchemeRecommendedLevel::Good, recommended_good },
-		{ CompressionSchemeRecommendedLevel::Best, recommended_best },
-		{ CompressionSchemeRecommendedLevel::No_Opinion, recommended_noopinion },
+	const std::unordered_map<q4b::CompressionSchemeRecommendedLevel, SDL_Texture*> recommendationStr_toTexId = {
+		{ q4b::CompressionSchemeRecommendedLevel::Awful, recommended_awful },
+		{ q4b::CompressionSchemeRecommendedLevel::Okay, recommended_okay },
+		{ q4b::CompressionSchemeRecommendedLevel::Good, recommended_good },
+		{ q4b::CompressionSchemeRecommendedLevel::Best, recommended_best },
+		{ q4b::CompressionSchemeRecommendedLevel::No_Opinion, recommended_noopinion },
 	};
 
     // Main loop
@@ -284,7 +284,7 @@ int main(int argc, char** argv)
 					}
 					ImGui::EndCombo();
 				}
-				const CompressionSchemeInfo* info = q4b::SCHEME_INFO[gdata.compressionScheme_idx];
+				const q4b::CompressionSchemeInfo* info = q4b::SCHEME_INFO[gdata.compressionScheme_idx];
 
 				ImGui::Indent();
 
@@ -608,7 +608,7 @@ int main(int argc, char** argv)
 
 					ImGui::NewLine();
 					if (ImGui::TreeNodeEx("Enabled Schemes", ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DefaultOpen)) {
-						for (const CompressionSchemeInfo* info : q4b::SCHEME_INFO) {
+						for (const q4b::CompressionSchemeInfo* info : q4b::SCHEME_INFO) {
 							ImGui::Bullet();
 							ImGui::TextUnformatted(info->displayName);
 						}

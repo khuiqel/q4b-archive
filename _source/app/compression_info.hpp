@@ -4,6 +4,8 @@
 #include <vector>
 #include "../q4b.hpp"
 
+namespace q4b {
+
 enum class CompressionSchemeRecommendedLevel : uint8_t {
 	No_Opinion,
 	Awful,
@@ -200,3 +202,5 @@ struct CompressionSchemeInfo_Stb final : public CompressionSchemeInfo {
 	void Initialize_Gui() override;
 };
 #endif
+
+} // namespace q4b

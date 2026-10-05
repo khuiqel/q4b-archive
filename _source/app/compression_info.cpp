@@ -1,6 +1,7 @@
 #include "compression_info.hpp"
 #include <climits> // INT_MAX
 
+namespace q4b {
 void CompressionSchemeInfo_Uncompressed::Initialize_Gui() {
 	char* str = new char[2];
 	str[0] = '0'; str[1] = '\0';
@@ -8,9 +9,11 @@ void CompressionSchemeInfo_Uncompressed::Initialize_Gui() {
 	clevel_val.push_back(0);
 	clevel_default_idx = 0;
 }
+} // namespace q4b
 
 #ifdef Q4B_ENABLE_LZ4
 #include <lz4frame.h>
+namespace q4b {
 void CompressionSchemeInfo_Lz4::Initialize_Gui() {
 	clevel_str.reserve(LZ4F_compressionLevel_max());
 	clevel_val.reserve(LZ4F_compressionLevel_max());
@@ -31,10 +34,12 @@ void CompressionSchemeInfo_Lz4::Initialize_Gui() {
 		clevel_val.push_back(i);
 	}
 }
+} // namespace q4b
 #endif
 
 #ifdef Q4B_ENABLE_ZSTD
 #include <zstd.h>
+namespace q4b {
 void CompressionSchemeInfo_Zstd::Initialize_Gui() {
 	clevel_str.reserve(ZSTD_maxCLevel()+1);
 	clevel_val.reserve(ZSTD_maxCLevel()+1);
@@ -63,10 +68,12 @@ void CompressionSchemeInfo_Zstd::Initialize_Gui() {
 	clevel_str.push_back(level_str);
 	clevel_val.push_back(INT_MAX);
 }
+} // namespace q4b
 #endif
 
 #ifdef Q4B_ENABLE_BROTLI
 #include <brotli/encode.h>
+namespace q4b {
 void CompressionSchemeInfo_Brotli::Initialize_Gui() {
 	clevel_str.reserve((BROTLI_MAX_QUALITY - BROTLI_MIN_QUALITY) + 1);
 	clevel_val.reserve((BROTLI_MAX_QUALITY - BROTLI_MIN_QUALITY) + 1);
@@ -88,10 +95,12 @@ void CompressionSchemeInfo_Brotli::Initialize_Gui() {
 		clevel_val.push_back(i);
 	}
 }
+} // namespace q4b
 #endif
 
 #ifdef Q4B_ENABLE_SNAPPY
 #include <snappy.h>
+namespace q4b {
 void CompressionSchemeInfo_Snappy::Initialize_Gui() {
 	constexpr int SnappyMinLevel = snappy::CompressionOptions::MinCompressionLevel();
 	constexpr int SnappyMaxLevel = snappy::CompressionOptions::MaxCompressionLevel();
@@ -116,9 +125,11 @@ void CompressionSchemeInfo_Snappy::Initialize_Gui() {
 		clevel_val.push_back(i);
 	}
 }
+} // namespace q4b
 #endif
 
 #ifdef Q4B_ENABLE_STB
+namespace q4b {
 void CompressionSchemeInfo_Stb::Initialize_Gui() {
 	char* str = new char[2];
 	str[0] = '0'; str[1] = '\0';
@@ -126,4 +137,5 @@ void CompressionSchemeInfo_Stb::Initialize_Gui() {
 	clevel_val.push_back(0);
 	clevel_default_idx = 0;
 }
+} // namespace q4b
 #endif
