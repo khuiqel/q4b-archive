@@ -5,14 +5,41 @@
 #include <bit> // std::popcount
 #include <climits> // INT_MAX
 #include <filesystem>
+#include <fstream>
+#include <iterator> // std::istreambuf_iterator
 
-const std::filesystem::path TEST_ARCHIVE_PATH = "tests/test.q4b";
-const std::filesystem::path TEST_ARCHIVE_PATH_2 = "tests/test2.q4b";
-const std::filesystem::path TEST_FILE = "res/NotoSans-Regular.ttf";
-const std::filesystem::path TEST_FILE_2 = "res/../res/NotoSans-Regular.ttf"; //TODO: get another file
+const std::filesystem::path TESTS_DIR = "tests";
+const std::filesystem::path TEST_ARCHIVE_PATH = TESTS_DIR / "test.q4b";
+const std::filesystem::path TEST_ARCHIVE_PATH_2 = TESTS_DIR / "test2.q4b";
+const std::filesystem::path TEST_FILE_NAME = "NotoSans-Regular.ttf";
+const std::filesystem::path TEST_FILE = "res" / TEST_FILE_NAME;
+const std::filesystem::path TEST_FILE_2 = "res/../res" / TEST_FILE_NAME; //TODO: get another file
+const std::filesystem::path TEST_FILE_DECOMPRESSED = TESTS_DIR / TEST_FILE_NAME;
+const std::filesystem::path TEST_FILE_2_DECOMPRESSED = TESTS_DIR / TEST_FILE_NAME;
 const std::filesystem::path TEST_FILE_NONEXISTENT = "nope.txt";
-const std::filesystem::path TEST_LIST_FILE = "tests/list.txt";
+const std::filesystem::path TEST_LIST_FILE = TESTS_DIR / "list.txt";
 constexpr int THREAD_COUNT = 4;
+
+// https://stackoverflow.com/questions/6163611/compare-two-files#37575457
+static bool FilesAreIdentical(const std::string& p1, const std::string& p2) {
+	std::ifstream f1(p1, std::ifstream::binary | std::ifstream::ate);
+	std::ifstream f2(p2, std::ifstream::binary | std::ifstream::ate);
+
+	if (f1.fail() || f2.fail()) {
+		return false; //file problem
+	}
+
+	if (f1.tellg() != f2.tellg()) {
+		return false; //size mismatch
+	}
+
+	//seek back to beginning and use std::equal to compare contents
+	f1.seekg(0, std::ifstream::beg);
+	f2.seekg(0, std::ifstream::beg);
+	return std::equal(std::istreambuf_iterator<char>(f1.rdbuf()),
+	                  std::istreambuf_iterator<char>(),
+	                  std::istreambuf_iterator<char>(f2.rdbuf()));
+}
 
 namespace {
 
@@ -121,13 +148,20 @@ TEST(WriteArchive, NoFiles) {
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader));
 
+	q4b::ArchiveHeader header;
+	std::vector<q4b::ArchivedFileHeader> list;
+	q4b::ReadArchiveHeader(TEST_ARCHIVE_PATH, header, list);
+
+	EXPECT_TRUE(std::equal(header.magic, header.magic + sizeof(header.magic), q4b::MAGIC_NUM));
+	EXPECT_TRUE(header.verifyHash());
+	EXPECT_TRUE(list.size() == 0);
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
 }
 
-TEST(WriteArchive, OneFileUncompressed) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileUncompressed) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 } };
@@ -136,13 +170,16 @@ TEST(WriteArchive, OneFileUncompressed) {
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 
 TEST(WriteArchive, TwoFilesUncompressed) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
@@ -157,9 +194,7 @@ TEST(WriteArchive, TwoFilesUncompressed) {
 TEST(WriteArchive, OneFileNonexistent) {
 	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTENT));
 
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE_NONEXISTENT, q4b::CompressionScheme::Uncompressed, 0 } };
@@ -175,9 +210,7 @@ TEST(WriteArchive, OneFileNonexistent) {
 TEST(WriteArchive, SomeFilesExist) {
 	ASSERT_FALSE(std::filesystem::exists(TEST_FILE_NONEXISTENT));
 
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_NONEXISTENT, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0 } };
@@ -208,10 +241,9 @@ TEST(WriteArchive, ThreeFilesDuplicateFail) {
 }
 
 #ifdef Q4B_ENABLE_LZ4
-TEST(WriteArchive, OneFileCompressedLz4) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileLz4) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::lz4, 1 } };
@@ -221,7 +253,13 @@ TEST(WriteArchive, OneFileCompressedLz4) {
 	// Assume LZ4 can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	// Verify LZ4 decompresses correctly
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 
 #if 0
@@ -255,10 +293,9 @@ TEST(WriteArchive, Lz4MetadataSmaller) {
 #endif
 
 #ifdef Q4B_ENABLE_ZSTD
-TEST(WriteArchive, OneFileCompressedZstd) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileZstd) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::zstd, 1 } };
@@ -268,11 +305,17 @@ TEST(WriteArchive, OneFileCompressedZstd) {
 	// Assume Zstd can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	// Verify Zstd decompresses correctly
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 
 #ifdef Q4B_ADVANCED_TESTS
-TEST(WriteArchive, OneFileCompressedZstdMax) {
+TEST(WriteArchive, OneFileZstdMax) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
 		std::filesystem::remove(TEST_ARCHIVE_PATH);
 	}
@@ -329,10 +372,9 @@ TEST(WriteArchive, ZstdMetadataSmaller) {
 #endif
 
 #ifdef Q4B_ENABLE_BROTLI
-TEST(WriteArchive, OneFileCompressedBrotli) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileBrotli) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::brotli, 1 } };
@@ -342,15 +384,20 @@ TEST(WriteArchive, OneFileCompressedBrotli) {
 	// Assume Brotli can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	// Verify Brotli decompresses correctly
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 #endif
 
 #ifdef Q4B_ENABLE_SNAPPY
-TEST(WriteArchive, OneFileCompressedSnappy) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileSnappy) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::snappy, 1 } };
@@ -360,36 +407,43 @@ TEST(WriteArchive, OneFileCompressedSnappy) {
 	// Assume Snappy can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	// Verify Snappy decompresses correctly
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 #endif
 
 #ifdef Q4B_ENABLE_STB
-TEST(WriteArchive, OneFileCompressedStb) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
+TEST(WriteArchiveAndUnpack, OneFileStb) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_FILE_DECOMPRESSED)) { std::filesystem::remove(TEST_FILE_DECOMPRESSED); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::stb, 0 } };
 	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
 
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
-	// Assume stb_compress can compress the test file to less than its original size
+	// Assume stb can compress the test file to less than its original size
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
+	// Verify stb decompresses correctly
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
+	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
+
 	std::filesystem::remove(TEST_ARCHIVE_PATH);
+	std::filesystem::remove(TEST_FILE_DECOMPRESSED);
 }
 #endif
 
 #if defined(Q4B_ENABLE_LZ4) && defined(Q4B_ENABLE_ZSTD)
-TEST(WriteArchive, TwoFilesCompressedLz4AndZstd) {
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH);
-	}
-	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) {
-		std::filesystem::remove(TEST_ARCHIVE_PATH_2);
-	}
+TEST(WriteArchive, TwoFilesLz4AndZstd) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH_2)) { std::filesystem::remove(TEST_ARCHIVE_PATH_2); }
 
 	std::vector<q4b::ErrorMessage> messages;
 	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::lz4, 1 }, { TEST_FILE_2, q4b::CompressionScheme::lz4, 1 } };
