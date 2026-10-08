@@ -76,8 +76,7 @@ inline bool SchemeIsEnabled(CompressionScheme scheme) {
 }
 
 inline XXH64_hash_t ComputeHash(void* data, size_t size) {
-	return XXH64(data, size, 0);
-	//XXH3 can do 64- or 128-bit hashes, and 128-bit is unnecessary
+	return XXH3_64bits(data, size);
 }
 
 #pragma pack(push, 1)
