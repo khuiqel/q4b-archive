@@ -800,25 +800,51 @@ void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<Compre
 		if (line.empty()) [[unlikely]] {
 			continue;
 		}
+		if (line[0] == ';' || line[0] == '#') {
+			continue;
+		}
 
 		std::istringstream iss(line);
 		std::string filename, scheme, level;
-
-		iss >> filename >> scheme >> level;
-
-		CompressionScheme s;
-		if (StrToScheme(scheme, &s)) {
-			s = CompressionScheme::Invalid;
+		if (line[0] == '\"') {
+			// Don't handle escaping
+			size_t pos = line.find('\"', 1);
+			if (pos == std::string::npos) {
+				file_list.push_back({ line, CompressionScheme::Invalid, -1 });
+				continue;
+			}
+			filename = line.substr(1, pos-1);
+			iss.seekg(pos+1);
+		} else {
+			iss >> filename;
 		}
 
-		int l;
+		if (filename.empty()) [[unlikely]] {
+			continue;
+		}
+
+		iss >> scheme >> level;
+		ReadArchiveInputOneLine(filename, scheme, level, file_list);
+	}
+}
+
+void ReadArchiveInputOneLine(const std::string& filename, const std::string& scheme, const std::string& level, std::vector<CompressionFile>& file_list) noexcept {
+	CompressionScheme s;
+	if (StrToScheme(scheme, &s)) {
+		s = CompressionScheme::Invalid;
+	}
+
+	int l;
+	if (level == "max" || level == "--max" || level == "MAX") {
+		l = INT_MAX;
+	} else {
 		std::from_chars_result res = std::from_chars(level.data(), level.data() + level.size(), l);
-		if (res.ec != std::errc()) {
+		if (res.ec != std::errc() || res.ptr != level.data() + level.size()) {
 			l = -1;
 		}
-
-		file_list.push_back({ filename, s, l });
 	}
+
+	file_list.push_back({ filename, s, l });
 }
 
 } // namespace q4b

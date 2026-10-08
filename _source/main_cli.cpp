@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
 	}
 
 	CLI::App app(DESCRIPTION_STR);
+	app.allow_subcommand_prefix_matching();
 	// app.set_help_flag();
 	// app.set_help_all_flag("-h,--help", "Print this help message and exit");
 	CLI::App* subcom_archive    = app.add_subcommand("archive",    "Create Q4B Archives");
@@ -32,9 +33,15 @@ int main(int argc, char** argv) {
 	CLI::App* subcom_compress   = app.add_subcommand("compress",   "Single file compression");
 	CLI::App* subcom_decompress = app.add_subcommand("decompress", "Single file decompression");
 	app.require_subcommand(1, 1);
+	std::vector<std::string> input_list;
 
-	subcom_archive->add_option("input_file", "Input file (format: file scheme level, on each line)")->required();
 	subcom_archive->add_option("output_archive", "Output Q4B archive")->required();
+	subcom_archive->add_option("root_dir", "Directory to which the files are relative to")->required();
+
+	CLI::Option_group* subcom_archive_files = subcom_archive->add_option_group("File Input");
+	subcom_archive_files->add_option("-i", "Input file list")->type_name("file.txt");
+	subcom_archive_files->add_option("-l", input_list, "List of files right here")->type_name("FILE SCHEME LEVEL")->type_size(3); // allow_extra_args(true)?
+	subcom_archive_files->require_option(1);
 
 	subcom_unpack->add_option("input_archive", "Input Q4B archive")->required();
 	subcom_unpack->add_option("input_file", "Input file (format: file, on each line)")->required(); //TODO: list of files OR single file (-f?)
@@ -63,14 +70,32 @@ int main(int argc, char** argv) {
 	CLI::App* subcom = app.get_subcommands()[0];
 	if (subcom == subcom_archive) {
 
-		const std::string FILES      = subcom_archive->get_option_no_throw("input_file")->as<std::string>();
 		const std::string ARCHIVE    = subcom_archive->get_option_no_throw("output_archive")->as<std::string>();
+		const std::string ROOT_DIR   = subcom_archive->get_option_no_throw("root_dir")->as<std::string>();
 
 		std::vector<q4b::CompressionFile> file_list;
-		q4b::ReadArchiveInputFile(FILES, file_list);
+		if (subcom_archive_files->get_option_no_throw("-i")->empty()) {
+			for (int i = 0; i < input_list.size() / 3; i++) {
+				q4b::ReadArchiveInputOneLine(input_list[i*3], input_list[i*3+1], input_list[i*3+2], file_list);
+			}
+		} else {
+			q4b::ReadArchiveInputFile(subcom_archive_files->get_option_no_throw("-i")->as<std::string>(), file_list);
+		}
 
 		std::vector<q4b::ErrorMessage> messages;
-		q4b::WriteArchive(file_list, ".", ARCHIVE, 4, &messages);
+		auto timeStart = std::chrono::steady_clock::now();
+		q4b::WriteArchive(file_list, ROOT_DIR, ARCHIVE, 4, &messages);
+		auto timeEnd = std::chrono::steady_clock::now();
+		auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart);
+
+		if (messages.empty()) {
+			std::cout << "Created archive in " << timeDiff << std::endl;
+		} else {
+			std::cout << "Error while creating archive" << std::endl;
+			for (const q4b::ErrorMessage& e : messages) {
+				std::cout << e.msg << std::endl;
+			}
+		}
 
 	} else if (subcom == subcom_unpack) {
 
@@ -134,7 +159,7 @@ int main(int argc, char** argv) {
 		}
 
 		if (scheme == q4b::CompressionScheme::Uncompressed) {
-			std::cerr << "ERROR: file is uncompressed, nothing to do\n";
+			std::cerr << "ERROR: scheme is uncompressed, nothing to do\n";
 			return 1;
 		}
 
@@ -151,7 +176,7 @@ int main(int argc, char** argv) {
 		} else {
 			std::from_chars_result res = std::from_chars(LEVEL.data(), LEVEL.data() + LEVEL.size(), level);
 			if (res.ec != std::errc()) {
-				//TODO
+				std::cerr << "ERROR: could not parse compression level\n";
 				level = -1;
 			}
 		}

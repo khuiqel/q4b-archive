@@ -4,5 +4,15 @@ res/NotoSans-Regular.ttf brotli 5 more words
 res/NotoSans-Regular.ttf snappy -7
 res/NotoSans-Regular.ttf stb
 
-res/NotoSans-Regular.ttf invalid 
+res/NotoSans-Regular.ttf invalid
 res/NotoSans-Regular.ttf
+
+;comment lz4 1
+# comment2
+
+tests/list.txt   LZ4 1a1
+ tests/list.txt      ZSTD   aaa
+ 
+"file\" Brotli 0
+"file with spaces"Snappy
+";file   with   spaces"   STB   

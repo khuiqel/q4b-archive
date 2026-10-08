@@ -284,12 +284,22 @@ const char* SchemeToDisplayStr(CompressionScheme scheme);
 
 /* Reads a text file containing files to be compressed. Intended for the CLI. Does not check if the filepath is valid.
  *
- * @param input [in] The text file. Format is "filename scheme level" per line. (TODO: support spaces in filename, also zstd --max... maybe this function just splits on spaces?)
+ * @param input [in] The text file. Format is "filename scheme level" per line. If the filename has spaces, wrap it in quotes. Lines beginning with ';' are ignored.
  * @param file_list [out] Output file list.
  *
  * @return void
- * TODO: errors
  */
 void ReadArchiveInputFile(const std::filesystem::path& input, std::vector<CompressionFile>& file_list) noexcept;
+
+/* Converts three text inputs into a CompressionFile. Used by the CLI.
+ *
+ * @param filename [in]
+ * @param scheme [in]
+ * @param level [in]
+ * @param file_list [out] Pushes the CompressionFile to this list.
+ *
+ * @return void
+ */
+void ReadArchiveInputOneLine(const std::string& filename, const std::string& scheme, const std::string& level, std::vector<CompressionFile>& file_list) noexcept;
 
 } // namespace q4b

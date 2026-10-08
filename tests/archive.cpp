@@ -467,11 +467,14 @@ TEST(WriteArchive, TwoFilesLz4AndZstd) {
 TEST(Others, ConvertTextToFileList) {
 	std::vector<q4b::CompressionFile> files;
 	q4b::ReadArchiveInputFile(TEST_LIST_FILE, files);
-	ASSERT_TRUE(files.size() == 7);
+	ASSERT_TRUE(files.size() == 12);
 
-	for (const auto& f : files) {
-		const std::string path = f.data.path;
+	for (int i = 0; i < 7; i++) {
+		const std::string path = files[i].data.path;
 		EXPECT_TRUE(path == TEST_FILE.generic_string());
+	}
+	for (int i = 3; i < 12; i++) {
+		EXPECT_TRUE(files[i].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 	}
 
 	EXPECT_TRUE(files[0].data.compression_type == q4b::CompressionScheme::lz4);
@@ -488,22 +491,41 @@ TEST(Others, ConvertTextToFileList) {
 
 	EXPECT_TRUE(files[3].data.compression_type == q4b::CompressionScheme::snappy);
 	EXPECT_TRUE(files[3].compression_level == -7); // Don't fix negative values
-	EXPECT_TRUE(files[3].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	EXPECT_TRUE(files[4].data.compression_type == q4b::CompressionScheme::stb);
 	EXPECT_TRUE(files[4].compression_level == -1); // Set to -1 if not present
-	EXPECT_TRUE(files[4].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	// Skip the empty line
-	EXPECT_FALSE(std::string(files[5].data.path).empty());
 
-	EXPECT_TRUE(files[5].data.compression_type == q4b::CompressionScheme::Invalid); // Unknown scheme
+	EXPECT_TRUE(files[5].data.compression_type == q4b::CompressionScheme::Invalid); // Unknown scheme (and trailing space)
 	EXPECT_TRUE(files[5].compression_level == -1);
-	EXPECT_TRUE(files[5].compression_flags == q4b::Q4B_CompressionFileFlags::None);
 
 	EXPECT_TRUE(files[6].data.compression_type == q4b::CompressionScheme::Invalid); // No scheme
 	EXPECT_TRUE(files[6].compression_level == -1);
-	EXPECT_TRUE(files[6].compression_flags == q4b::Q4B_CompressionFileFlags::None);
+
+	// Comment lines
+
+	EXPECT_TRUE(files[7].data.path == TEST_LIST_FILE.generic_string());
+	EXPECT_TRUE(files[7].data.compression_type == q4b::CompressionScheme::lz4);
+	EXPECT_TRUE(files[7].compression_level == -1); // Couldn't parse the full number
+
+	EXPECT_TRUE(files[8].data.path == TEST_LIST_FILE.generic_string()); // Ignore leading whitespace (because that's what std::istringstream does)
+	EXPECT_TRUE(files[8].data.compression_type == q4b::CompressionScheme::zstd);
+	EXPECT_TRUE(files[8].compression_level == -1);
+
+	// Skip whitespace-only lines
+
+	EXPECT_TRUE(files[9].data.path == std::string("file/")); // Don't escape the quote
+	EXPECT_TRUE(files[9].data.compression_type == q4b::CompressionScheme::brotli);
+	EXPECT_TRUE(files[9].compression_level == 0);
+
+	EXPECT_TRUE(files[10].data.path == std::string("file with spaces"));
+	EXPECT_TRUE(files[10].data.compression_type == q4b::CompressionScheme::snappy); // Allow name right after quote
+	EXPECT_TRUE(files[10].compression_level == -1);
+
+	EXPECT_TRUE(files[11].data.path == std::string(";file   with   spaces")); // Comments only for the first character
+	EXPECT_TRUE(files[11].data.compression_type == q4b::CompressionScheme::stb); // Trailing space
+	EXPECT_TRUE(files[11].compression_level == -1);
 }
 #endif
 
