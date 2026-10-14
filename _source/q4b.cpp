@@ -41,6 +41,12 @@ bool ArchivedFileHeader::pathIsValid() const {
 		return false;
 	}
 
+	// No NTFS-invalid characters
+	constexpr char NTFS_LIST[] = { ':', '*', '\"', '?', '<', '>', '|' };
+	if (std::any_of(path, path + Q4B_MAX_PATH, [&NTFS_LIST](auto val) { return std::find(NTFS_LIST, NTFS_LIST + std::size(NTFS_LIST), val) != NTFS_LIST + std::size(NTFS_LIST); })) {
+		return false;
+	}
+
 	return true;
 };
 

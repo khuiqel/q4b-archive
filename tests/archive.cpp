@@ -108,6 +108,17 @@ TEST(ArchiveStructs, SetPathBackslash) {
 	EXPECT_FALSE(file_header.pathIsValid());
 }
 
+TEST(ArchiveStructs, SetPathNtfs) {
+	q4b::ArchivedFileHeader file_header;
+	file_header.setPath(TEST_FILE.string());
+	ASSERT_TRUE(file_header.pathIsValid());
+
+	for (auto c : { ':', '*', '\"', '?', '<', '>', '|' }) {
+		file_header.path[0] = c;
+		EXPECT_FALSE(file_header.pathIsValid());
+	}
+}
+
 TEST(ArchiveStructs, CompressionFileFlags) {
 	// Test constructors
 	q4b::CompressionFile file1;

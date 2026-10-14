@@ -118,8 +118,26 @@ struct ArchivedFileHeader {
 	inline void unsetFlag(Q4B_ArchivedFileFlags flag) { flags &= ~static_cast<uint32_t>(flag); }
 	inline bool getFlag(Q4B_ArchivedFileFlags flag) const { return flags & static_cast<uint32_t>(flag); }
 
-	bool pathIsValid() const; // Returns true for: 1. no backslashes; 2. last byte in array is \0 (to be able to make it a string); 3. end of string to end of array is \0 //TODO: another function to check for NTFS-invalid characters
-	void setPath(const std::string& path); // Writes the path, replacing backslashes and filling the remainder of the array with \0
+	/* Returns true given the following conditions:
+	 * 1. no backslashes
+	 * 2. last byte in array is \0 (to be able to make it a string)
+	 * 3. end of string to end of array is \0
+	 * 4. no NTFS-invalid characters (:, *, ", ?, <, >, |)
+	 * Assumes the path is UTF-8.
+	 */
+	bool pathIsValid() const;
+
+	/* Writes the path, making the following conversions:
+	 * 1. replaces backslashes with forward slashes
+	 * 2. fills remainder of array with \0
+	 * Does not do the following:
+	 * 1. verify the string fits in the array
+	 * 2. verify the path makes sense ("/////" technically works)
+	 * 3. remove NTFS-invalid characters (:, *, ", ?, <, >, |)
+	 * 4. convert the path to lowercase (different from P3A!)
+	 * Assumes the path is UTF-8.
+	 */
+	void setPath(const std::string& path);
 };
 static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
