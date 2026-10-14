@@ -117,7 +117,7 @@ struct ErrorMessage {
  * @return A list of the files compressed, allocated using `new[]`, nullptr on failure.
  */
 template <bool extraFeatures, bool GenericExport>
-std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
+std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
@@ -210,7 +210,7 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
  * @return A list of the files decompressed, allocated using `new[]`, nullptr on failure.
  */
 template <bool extraFeatures>
-std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
+std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 	const std::filesystem::path& input,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
@@ -268,7 +268,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
  *
  * @return Size of the file. -1 if error. If the full file couldn't be loaded, returns -1.
  */
-[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) noexcept;
+[[nodiscard]] int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept;
 
 // Returns 1 on failure, sets scheme on success
 int ExtToScheme(const std::string& FILE_EXT, CompressionScheme* scheme);

@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
 		const bool BENCHMARK_MODE = subcom_compress->get_option_no_throw("--bench")->as<bool>();
 
 		// if (std::filesystem::exists(INPUT) && std::filesystem::is_directory(OUTPUT_DIR)) {
-		void* file_data;
+		char* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
 			std::cerr << "ERROR: file not found\n";
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		void* compressed_file_data;
+		char* compressed_file_data;
 		const q4b::Q4B_CompressionFileFlags flags = WRITE_METADATA ? q4b::Q4B_CompressionFileFlags::DoWriteMetadata : q4b::Q4B_CompressionFileFlags::None;
 		auto timeStart = std::chrono::steady_clock::now();
 		uint64_t compressedSize = functions->Compress_GenericExport(level, flags, file_data, file_size, &compressed_file_data);
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
 		                               "." : subcom_decompress->get_option_no_throw("-o")->as<std::string>();
 		const bool BENCHMARK_MODE = subcom_decompress->get_option_no_throw("--bench")->as<bool>();
 
-		void* file_data;
+		char* file_data;
 		const int64_t file_size = q4b::LoadFileIntoMemory(INPUT, &file_data);
 		if (file_size == -1) {
 			std::cerr << "ERROR: file not found\n";
@@ -258,7 +258,7 @@ int main(int argc, char** argv) {
 		// 	cratio = std::stof(RATIO);
 		// }
 
-		void* decompressed_file;
+		char* decompressed_file;
 		auto timeStart = std::chrono::steady_clock::now();
 		uint64_t decompressedSize = functions->Decompress_UnknownSize(file_data, file_size, &decompressed_file);
 		auto timeEnd = std::chrono::steady_clock::now();

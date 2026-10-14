@@ -83,7 +83,7 @@ static CompressionSchemeInfo* SchemeToInfo(CompressionScheme scheme) {
 }
 
 template <bool extraFeatures, bool GenericExport>
-std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
+std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
@@ -115,7 +115,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 	}
 
 	// Compress files
-	std::vector<std::pair<ArchivedFileHeader, void*>> compressed_files_data; compressed_files_data.reserve(file_list.size());
+	std::vector<std::pair<ArchivedFileHeader, char*>> compressed_files_data; compressed_files_data.reserve(file_list.size());
 
 	for (int i = 0; i < file_list.size(); i++) {
 		if constexpr (extraFeatures)
@@ -125,7 +125,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 			}
 
 		const CompressionFile& file = file_list[i];
-		void* file_data;
+		char* file_data;
 		const int64_t file_size = LoadFileIntoMemory(root_file_path / file.data.path, &file_data);
 		if (file_size == -1) [[unlikely]] {
 			messages->push_back({ ErrorSeverity::error, "Could not load file \"" + (root_file_path / file.data.path).string() + "\"" });
@@ -157,7 +157,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 					messages->push_back({ ErrorSeverity::warn, std::string(info->displayName) + " doesn't support writing metadata" });
 				}
 
-				void* outputData;
+				char* outputData;
 				uint64_t compressedSize;
 				if constexpr (GenericExport) {
 					compressedSize = functions->Compress_GenericExport(file.compression_level, (q4b::Q4B_CompressionFileFlags)file.compression_flags, file_data, file_size, &outputData);
@@ -191,19 +191,19 @@ std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal(
 
 	return compressed_files_data;
 }
-template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, false>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal<false, false>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
-template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<false, true>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal<false, true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
-template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, false>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal<true, false>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
-template std::vector<std::pair<ArchivedFileHeader, void*>> CompressFiles_internal<true, true>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal<true, true>(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
@@ -416,7 +416,7 @@ template void WriteArchive_internal<false>(
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
-std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
+std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 	const std::filesystem::path& input,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
@@ -488,7 +488,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
 	}
 
 	// Decompress files
-	std::vector<std::pair<ArchivedFileHeader, void*>> decompressed_files_data; decompressed_files_data.reserve(ah.num_files);
+	std::vector<std::pair<ArchivedFileHeader, char*>> decompressed_files_data; decompressed_files_data.reserve(ah.num_files);
 	for (int i = 0; i < ah.num_files; i++) {
 		if constexpr (extraFeatures)
 			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
@@ -501,8 +501,8 @@ std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
 			return decompressed_files_data;
 		}
 
-		void* compressedFile = new char[headers[i].compressed_size];
-		archive.read((char*)compressedFile, headers[i].compressed_size);
+		char* compressedFile = new char[headers[i].compressed_size];
+		archive.read(compressedFile, headers[i].compressed_size);
 		bytesRead = archive.gcount();
 		if (!archive || bytesRead != headers[i].compressed_size) {
 			messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
@@ -532,7 +532,7 @@ std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
 				decompressed_files_data.push_back({ {}, nullptr });
 				delete[] compressedFile;
 			} else {
-				void* outputData;
+				char* outputData;
 				uint64_t decompressedSize;
 				decompressedSize = functions->Decompress(compressedFile, headers[i].compressed_size, &outputData, headers[i].uncompressed_size);
 				file_header.uncompressed_size = decompressedSize;
@@ -563,11 +563,11 @@ std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal(
 
 	return decompressed_files_data;
 }
-template std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal<true>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal<true>(
 	const std::filesystem::path& input,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
-template std::vector<std::pair<ArchivedFileHeader, void*>> DecompressArchive_internal<false>(
+template std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal<false>(
 	const std::filesystem::path& input,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
@@ -713,7 +713,7 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 	return true;
 }
 
-int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, void** dest) noexcept {
+int64_t LoadFileIntoMemory(const std::filesystem::path& filepath, char** dest) noexcept {
 	// Open file (at the end)
 	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
 	if (!file) {
