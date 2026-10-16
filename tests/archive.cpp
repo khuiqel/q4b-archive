@@ -181,7 +181,8 @@ TEST(WriteArchiveAndUnpack, OneFileUncompressed) {
 	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
 	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -265,7 +266,8 @@ TEST(WriteArchiveAndUnpack, OneFileLz4) {
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
 	// Verify LZ4 decompresses correctly
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -317,7 +319,8 @@ TEST(WriteArchiveAndUnpack, OneFileZstd) {
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
 	// Verify Zstd decompresses correctly
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -396,7 +399,8 @@ TEST(WriteArchiveAndUnpack, OneFileBrotli) {
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
 	// Verify Brotli decompresses correctly
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -419,7 +423,8 @@ TEST(WriteArchiveAndUnpack, OneFileSnappy) {
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
 	// Verify Snappy decompresses correctly
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -442,7 +447,8 @@ TEST(WriteArchiveAndUnpack, OneFileStb) {
 	EXPECT_LT(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE));
 
 	// Verify stb decompresses correctly
-	q4b::UnpackArchive(TEST_ARCHIVE_PATH, TESTS_DIR, &messages);
+	std::vector<q4b::ArchivedFileHeader> unpack_list = { files[0].data };
+	q4b::UnpackArchive(TEST_ARCHIVE_PATH, unpack_list, TESTS_DIR, &messages);
 	ASSERT_TRUE(std::filesystem::exists(TEST_FILE_DECOMPRESSED));
 	EXPECT_TRUE(FilesAreIdentical(TEST_FILE.string(), TEST_FILE_DECOMPRESSED.string()));
 
@@ -473,6 +479,11 @@ TEST(WriteArchive, TwoFilesLz4AndZstd) {
 }
 #endif
 
+
+TEST(Others, InvalidSchemeDoesNotExist) {
+	EXPECT_FALSE(q4b::SchemeIsEnabled(q4b::CompressionScheme::Invalid));
+	EXPECT_TRUE(q4b::SchemeToFunctions(q4b::CompressionScheme::Invalid) == nullptr);
+}
 
 #if defined(Q4B_ENABLE_LZ4) && defined(Q4B_ENABLE_ZSTD)
 TEST(Others, ConvertTextToFileList) {

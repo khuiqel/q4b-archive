@@ -44,8 +44,12 @@ int main(int argc, char** argv) {
 	subcom_archive_files->require_option(1);
 
 	subcom_unpack->add_option("input_archive", "Input Q4B archive")->required();
-	subcom_unpack->add_option("input_file", "Input file (format: file, on each line)")->required(); //TODO: list of files OR single file (-f?)
 	subcom_unpack->add_option("-o", "Output folder");
+
+	CLI::Option_group* subcom_unpack_files = subcom_unpack->add_option_group("File Input");
+	subcom_unpack_files->add_option("-i", "Input file list")->type_name("file.txt");
+	subcom_unpack_files->add_option("-l", input_list, "List of files right here")->type_name("FILE");
+	subcom_unpack_files->require_option(1);
 
 	subcom_inspect->add_option("input_archive", "Input Q4B archive")->required();
 	subcom_inspect->add_flag("-c", "Calculate and verify metadata"); //TODO
@@ -99,16 +103,39 @@ int main(int argc, char** argv) {
 
 	} else if (subcom == subcom_unpack) {
 
-		const std::string ARCHIVE    = subcom_archive->get_option_no_throw("input_archive")->as<std::string>();
-		const std::string FILES      = subcom_archive->get_option_no_throw("input_file")->as<std::string>();
-		const std::string OUTPUT_DIR = subcom_archive->get_option_no_throw("-o")->empty() ?
-		                               "." : subcom_archive->get_option_no_throw("-o")->as<std::string>();
+		const std::string ARCHIVE    = subcom_unpack->get_option_no_throw("input_archive")->as<std::string>();
+		const std::string OUTPUT_DIR = subcom_unpack->get_option_no_throw("-o")->empty() ?
+		                               "." : subcom_unpack->get_option_no_throw("-o")->as<std::string>();
 
 		std::vector<q4b::CompressionFile> file_list;
-		q4b::ReadArchiveInputFile(FILES, file_list);
+		if (subcom_unpack_files->get_option_no_throw("-i")->empty()) {
+			for (int i = 0; i < input_list.size(); i++) {
+				q4b::ReadArchiveInputOneLine(input_list[i], "", "", file_list);
+			}
+		} else {
+			q4b::ReadArchiveInputFile(subcom_unpack_files->get_option_no_throw("-i")->as<std::string>(), file_list);
+		}
+
+		std::vector<q4b::ArchivedFileHeader> unpack_list;
+		std::transform(file_list.begin(), file_list.end(),
+			std::back_inserter(unpack_list),
+			[](const q4b::CompressionFile& file) { return file.data; }
+		);
 
 		std::vector<q4b::ErrorMessage> messages;
-		q4b::UnpackArchive(ARCHIVE, OUTPUT_DIR, &messages);
+		auto timeStart = std::chrono::steady_clock::now();
+		q4b::UnpackArchive(ARCHIVE, unpack_list, OUTPUT_DIR, &messages);
+		auto timeEnd = std::chrono::steady_clock::now();
+		auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart);
+
+		if (messages.empty()) {
+			std::cout << "Unpacked archive in " << timeDiff << std::endl;
+		} else {
+			std::cout << "Error while unpacking archive" << std::endl;
+			for (const q4b::ErrorMessage& e : messages) {
+				std::cout << e.msg << std::endl;
+			}
+		}
 
 	} else if (subcom == subcom_inspect) {
 
@@ -124,11 +151,11 @@ int main(int argc, char** argv) {
 		          << archiveHeader.num_files << " "
 		          << archiveHeader.self_hash << std::endl;
 		for (const q4b::ArchivedFileHeader& file_header : fileList) {
-			std::cout << file_header.path << " "
-			          << q4b::SchemeToDisplayStr(file_header.compression_type) << " "
-			          << file_header.compressed_size << " "
-			          << file_header.uncompressed_size << " "
-			          << file_header.compressed_hash << " "
+			std::cout << file_header.path << "\t"
+			          << q4b::SchemeToDisplayStr(file_header.compression_type) << "\t"
+			          << file_header.compressed_size << "\t"
+			          << file_header.uncompressed_size << "\t"
+			          << file_header.compressed_hash << "\t"
 			          << file_header.uncompressed_hash << std::endl;
 		}
 
@@ -246,7 +273,7 @@ int main(int argc, char** argv) {
 		}
 
 		q4b::CompressionSchemeFunctions* functions = q4b::SchemeToFunctions(scheme);
-		if (functions == nullptr) {
+		if (functions == nullptr) [[unlikely]] {
 			std::cerr << "ERROR: unsupported scheme\n";
 			return 1;
 		}

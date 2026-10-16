@@ -86,8 +86,8 @@ template <bool extraFeatures, bool GenericExport>
 std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path,
 	std::vector<ErrorMessage>* messages,
-	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	// Check for valid compression schemes and existence
 	{
 		bool allSchemesValid = true;
@@ -212,8 +212,8 @@ template <bool extraFeatures>
 void WriteCompressedFiles_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	// Check for duplicate filenames
 	// Valid schemes and existence are checked in CompressFiles_internal()
 	{
@@ -297,8 +297,8 @@ template <bool extraFeatures>
 void WriteArchive_internal(
 	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
 	int threadCount, std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	// Check for valid paths and duplicate paths
 	// Valid schemes and existence are checked in CompressFiles_internal()
 	{
@@ -417,12 +417,12 @@ template void WriteArchive_internal<false>(
 
 template <bool extraFeatures>
 std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
-	const std::filesystem::path& input,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list,
 	std::vector<ErrorMessage>* messages,
-	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	// Open file
-	std::ifstream archive(input, std::ios::binary | std::ios::ate);
+	std::ifstream archive(input_archive, std::ios::binary | std::ios::ate);
 	if (!archive) {
 		messages->push_back({ ErrorSeverity::error, "Couldn't open archive" });
 		return {};
@@ -488,7 +488,7 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 	}
 
 	// Decompress files
-	std::vector<std::pair<ArchivedFileHeader, char*>> decompressed_files_data; decompressed_files_data.reserve(ah.num_files);
+	std::vector<std::pair<ArchivedFileHeader, char*>> decompressed_files_data; decompressed_files_data.reserve(input_list.size());
 	for (int i = 0; i < ah.num_files; i++) {
 		if constexpr (extraFeatures)
 			if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
@@ -499,6 +499,36 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 		if (archiveSize < file_offset + headers[i].compressed_size) {
 			messages->push_back({ ErrorSeverity::error, "Archive is too small for every compressed file" });
 			return decompressed_files_data;
+		}
+
+		if (!headers[i].pathIsValid()) {
+			//TODO: doesn't this also have to check for duplicate filepaths?
+			messages->push_back({ ErrorSeverity::error, "Invalid path for file idx " + std::to_string(i) });
+			archive.seekg(headers[i].compressed_size, std::ios::cur);
+			if (!archive) {
+				messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+				return decompressed_files_data;
+			}
+			file_offset += headers[i].compressed_size;
+			continue;
+		}
+
+		bool fileInList = false;
+		for (const auto& file : input_list) {
+			if (std::equal(headers[i].path, headers[i].path + Q4B_MAX_PATH, file.path)) {
+				fileInList = true;
+				break;
+			}
+			//TODO: need to push a message for files that aren't in the archive
+		}
+		if (!fileInList) {
+			archive.seekg(headers[i].compressed_size, std::ios::cur);
+			if (!archive) {
+				messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+				return decompressed_files_data;
+			}
+			file_offset += headers[i].compressed_size;
+			continue;
 		}
 
 		char* compressedFile = new char[headers[i].compressed_size];
@@ -516,10 +546,6 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 		file_header.compression_type = headers[i].compression_type;
 		file_header.compressed_size = headers[i].compressed_size;
 		file_header.flags = 0;
-
-		if (!file_header.pathIsValid()) {
-			messages->push_back({ ErrorSeverity::error, "Invalid path for file idx " + std::to_string(i) });
-		}
 
 		if (headers[i].compression_type == CompressionScheme::Uncompressed) {
 			file_header.uncompressed_size = file_header.compressed_size;
@@ -564,20 +590,20 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 	return decompressed_files_data;
 }
 template std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal<true>(
-	const std::filesystem::path& input,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal<false>(
-	const std::filesystem::path& input,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
 void UnpackArchive_internal(
-	const std::filesystem::path& input, const std::filesystem::path& output,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
 	std::vector<ErrorMessage>* messages,
-	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	// Create output directory
 	std::error_code ec;
 	if (std::filesystem::exists(output, ec)) {
@@ -585,7 +611,7 @@ void UnpackArchive_internal(
 			messages->push_back({ ErrorSeverity::error, "Output directory is not a directory" });
 			return;
 		}
-	} else if (ec) {
+	} else if (ec) [[unlikely]] {
 		messages->push_back({ ErrorSeverity::error, "Filesystem error" });
 		return;
 	} else {
@@ -597,7 +623,7 @@ void UnpackArchive_internal(
 
 	// Unpack
 	//TODO: should it return the expected number of files determined from the header?
-	auto decompressed_files_data = DecompressArchive_internal<extraFeatures>(input, messages, exit_flag, files_completed);
+	auto decompressed_files_data = DecompressArchive_internal<extraFeatures>(input_archive, input_list, messages, exit_flag, files_completed);
 
 	if constexpr (extraFeatures)
 		if (exit_flag->load(std::memory_order_acquire)) [[unlikely]] {
@@ -655,11 +681,11 @@ void UnpackArchive_internal(
 	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 }
 template void UnpackArchive_internal<true>(
-	const std::filesystem::path& input, const std::filesystem::path& output,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
 	std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 template void UnpackArchive_internal<false>(
-	const std::filesystem::path& input, const std::filesystem::path& output,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
 	std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 

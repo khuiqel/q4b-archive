@@ -140,10 +140,11 @@ void WriteCompressedFiles_internal(
  *
  * @return void
  */
-inline void WriteCompressedFiles(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
-                                 std::vector<ErrorMessage>* messages,
-                                 std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+inline void WriteCompressedFiles(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	WriteCompressedFiles_internal<true>(file_list, root_file_path, output_dir, messages, working_flag, exit_flag, files_completed);
 }
 
@@ -156,16 +157,18 @@ inline void WriteCompressedFiles(const std::vector<CompressionFile>& file_list, 
  *
  * @return void
  */
-inline void WriteCompressedFiles(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
-                                 std::vector<ErrorMessage>* messages) noexcept {
-
+inline void WriteCompressedFiles(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output_dir,
+	std::vector<ErrorMessage>* messages) noexcept
+{
 	WriteCompressedFiles_internal<false>(file_list, root_file_path, output_dir, messages, nullptr, nullptr, nullptr);
 }
 
 template <bool extraFeatures>
-void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                           int threadCount, std::vector<ErrorMessage>* messages,
-                           std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+void WriteArchive_internal(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	int threadCount, std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 /* Writes the Q4B archive.
  *
@@ -180,10 +183,11 @@ void WriteArchive_internal(const std::vector<CompressionFile>& file_list, const 
  *
  * @return void
  */
-inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         int threadCount, std::vector<ErrorMessage>* messages,
-                         std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
+inline void WriteArchive(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	int threadCount, std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
 	WriteArchive_internal<true>(file_list, root_file_path, output, threadCount, messages, working_flag, exit_flag, files_completed);
 }
 
@@ -197,8 +201,10 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
  *
  * @return void
  */
-inline void WriteArchive(const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
-                         int threadCount, std::vector<ErrorMessage>* messages) noexcept {
+inline void WriteArchive(
+	const std::vector<CompressionFile>& file_list, const std::filesystem::path& root_file_path, const std::filesystem::path& output,
+	int threadCount, std::vector<ErrorMessage>* messages) noexcept
+{
 	WriteArchive_internal<false>(file_list, root_file_path, output, threadCount, messages, nullptr, nullptr, nullptr);
 }
 
@@ -211,18 +217,20 @@ inline void WriteArchive(const std::vector<CompressionFile>& file_list, const st
  */
 template <bool extraFeatures>
 std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
-	const std::filesystem::path& input,
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list,
 	std::vector<ErrorMessage>* messages,
 	const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 template <bool extraFeatures>
-void UnpackArchive_internal(const std::filesystem::path& input, const std::filesystem::path& output,
-                            std::vector<ErrorMessage>* messages,
-                            std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
+void UnpackArchive_internal(
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept;
 
 /* Unpacks a Q4B archive.
  *
- * @param input [in] Name of the archive.
+ * @param input_archive [in] Name of the archive.
+ * @param input_list [in] List of files to unpack from the archive.
  * @param output [in] Output folder for the files.
  * @param messages [out,optional] Accumulated error messages. (TODO)
  * @param working_flag [out] Flag to signal if the function is still running.
@@ -231,24 +239,28 @@ void UnpackArchive_internal(const std::filesystem::path& input, const std::files
  *
  * @return void
  */
-inline void UnpackArchive(const std::filesystem::path& input, const std::filesystem::path& output,
-                          std::vector<ErrorMessage>* messages,
-                          std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept {
-
-	UnpackArchive_internal<true>(input, output, messages, working_flag, exit_flag, files_completed);
+inline void UnpackArchive(
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages,
+	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
+{
+	UnpackArchive_internal<true>(input_archive, input_list, output, messages, working_flag, exit_flag, files_completed);
 }
 
 /* Unpacks a Q4B archive.
  *
- * @param input [in] Name of the archive.
+ * @param input_archive [in] Name of the archive.
+ * @param input_list [in] List of files to unpack from the archive.
  * @param output [in] Output folder for the files.
  * @param messages [out,optional] Accumulated error messages. (TODO)
  *
  * @return void
  */
-inline void UnpackArchive(const std::filesystem::path& input, const std::filesystem::path& output,
-                          std::vector<ErrorMessage>* messages) noexcept {
-	UnpackArchive_internal<false>(input, output, messages, nullptr, nullptr, nullptr);
+inline void UnpackArchive(
+	const std::filesystem::path& input_archive, const std::vector<ArchivedFileHeader>& input_list, const std::filesystem::path& output,
+	std::vector<ErrorMessage>* messages) noexcept
+{
+	UnpackArchive_internal<false>(input_archive, input_list, output, messages, nullptr, nullptr, nullptr);
 }
 
 /* Reads the header of a Q4B archive.

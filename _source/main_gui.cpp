@@ -219,13 +219,13 @@ int main(int argc, char** argv)
 			ImGui::TextUnformatted("Drop files here");
 
 			const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-			static ImGui_ExampleSelectionWithDeletion selection;
-			selection.UserData = (void*)&FILE_LIST;
-			selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
+			static ImGui_ExampleSelectionWithDeletion archive_selection;
+			archive_selection.UserData = (void*)&FILE_LIST;
+			archive_selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
 
-			const int ITEMS_COUNT = FILE_LIST.size();
-			ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
-			if (ImGui::BeginTable("Selection", 4, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
+			const int ARCHIVE_ITEMS_COUNT = FILE_LIST.size();
+			ImGui::Text("Selection: %i/%i", archive_selection.Size, ARCHIVE_ITEMS_COUNT);
+			if (ImGui::BeginTable("Archive Selection", 4, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
 				ImGui::TableSetupColumn("File", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Scheme");
 				ImGui::TableSetupColumn("Level");
@@ -234,18 +234,18 @@ int main(int argc, char** argv)
 				ImGui::TableHeadersRow();
 
 				const ImGuiMultiSelectFlags selection_flags = ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
-				ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(selection_flags, selection.Size, ITEMS_COUNT);
-				selection.ApplyRequests(ms_io);
+				ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(selection_flags, archive_selection.Size, ARCHIVE_ITEMS_COUNT);
+				archive_selection.ApplyRequests(ms_io);
 
-				const bool want_delete = ImGui::Shortcut(ImGuiKey_Delete, ImGuiInputFlags_Repeat) && (selection.Size > 0);
-				const int item_curr_idx_to_focus = want_delete ? selection.ApplyDeletionPreLoop(ms_io, ITEMS_COUNT) : -1;
+				const bool want_delete = ImGui::Shortcut(ImGuiKey_Delete, ImGuiInputFlags_Repeat) && (archive_selection.Size > 0);
+				const int item_curr_idx_to_focus = want_delete ? archive_selection.ApplyDeletionPreLoop(ms_io, ARCHIVE_ITEMS_COUNT) : -1;
 
-				for (int n = 0; n < ITEMS_COUNT; n++)
+				for (int n = 0; n < ARCHIVE_ITEMS_COUNT; n++)
 				{
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::PushID(n);
-					bool item_is_selected = selection.Contains((ImGuiID)n);
+					bool item_is_selected = archive_selection.Contains((ImGuiID)n);
 					ImGui::SetNextItemSelectionUserData(n);
 					ImGui::Selectable(FILE_LIST[n].getFilepath(), &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
 					if (item_curr_idx_to_focus == n)
@@ -264,9 +264,9 @@ int main(int argc, char** argv)
 				}
 
 				ms_io = ImGui::EndMultiSelect();
-				selection.ApplyRequests(ms_io);
+				archive_selection.ApplyRequests(ms_io);
 				if (want_delete)
-					selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
+					archive_selection.ApplyDeletionPostLoop(ms_io, FILE_LIST, item_curr_idx_to_focus);
 				ImGui::EndTable();
 			}
 			if (!rootDirIsLocked || THREAD_IS_WORKING) { ImGui::EndDisabled(); }
@@ -315,8 +315,8 @@ int main(int argc, char** argv)
 
 				if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 				if (ImGui::Button("Change Files")) {
-					for (int i = 0; i < ITEMS_COUNT; i++) {
-						if (selection.Contains((ImGuiID)i)) {
+					for (int i = 0; i < ARCHIVE_ITEMS_COUNT; i++) {
+						if (archive_selection.Contains((ImGuiID)i)) {
 							FILE_LIST[i].data.compression_type = gdata.get_compression_type();
 							FILE_LIST[i].compression_level = gdata.get_compression_level();
 							if (metadata_for_files) {
@@ -334,6 +334,7 @@ int main(int argc, char** argv)
 				if (ImGui::Button(rootDirIsLocked ? "Unlock" : "Lock", { ImGui::CalcTextSize("Unlock").x + 2*style.FramePadding.x, 0.0f })) {
 					if (rootDirIsLocked) {
 						FILE_LIST.clear();
+						archive_selection.Clear();
 					}
 					rootDirIsLocked = !rootDirIsLocked;
 				}
@@ -366,7 +367,7 @@ int main(int argc, char** argv)
 					}
 				}
 				if (ImGui::Button("Toggle metadata flag on all")) {
-					for (int i = 0; i < ITEMS_COUNT; i++) {
+					for (int i = 0; i < ARCHIVE_ITEMS_COUNT; i++) {
 						if (FILE_LIST[i].getFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata)) {
 							FILE_LIST[i].unsetFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata);
 						} else {
@@ -376,11 +377,11 @@ int main(int argc, char** argv)
 				}
 				if (ARCHIVING) {
 					if (ImGui::Button("Disable metadata flag on all")) {
-						for (int i = 0; i < ITEMS_COUNT; i++) { FILE_LIST[i].unsetFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata); }
+						for (int i = 0; i < ARCHIVE_ITEMS_COUNT; i++) { FILE_LIST[i].unsetFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata); }
 					}
 				} else {
 					if (ImGui::Button("Enable metadata flag on all")) {
-						for (int i = 0; i < ITEMS_COUNT; i++) { FILE_LIST[i].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata); }
+						for (int i = 0; i < ARCHIVE_ITEMS_COUNT; i++) { FILE_LIST[i].setFlag(q4b::Q4B_CompressionFileFlags::DoWriteMetadata); }
 					}
 				}
 				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
@@ -454,18 +455,24 @@ int main(int argc, char** argv)
 
 					ImGui::SeparatorText("Inspect");
 
+					static ImGuiSelectionBasicStorage unpack_selection;
+					unpack_selection.UserData = (void*)&gdata.viewingArchiveFileList;
+					unpack_selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return (ImGuiID)idx; };
+
 					if (ImGui::Button("Read Archive Header")) {
+						unpack_selection.Clear();
 						gdata.viewingArchiveFileList.clear();
+						gdata.selectedArchiveFileList.clear();
 						bool success = q4b::ReadArchiveHeader(archive_file_path, gdata.viewingArchiveHeader, gdata.viewingArchiveFileList);
 						gdata.viewingArchive = success;
 					}
 
-					//TODO: select these files for decompression
 					if (gdata.viewingArchive) {
 						if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 						ImGui::SameLine();
 						if (ImGui::Button("Stop Viewing")) {
 							gdata.viewingArchive = false;
+							unpack_selection.Clear();
 						}
 						if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
 
@@ -485,38 +492,54 @@ int main(int argc, char** argv)
 						ImGui::TextUnformatted("Number of files:"); ImGui::SameLine();
 						ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
 
-						const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-						if (ImGui::BeginTable("table1", 4, table_flags, { 0.0f, 16 * ImGui::GetTextLineHeightWithSpacing() })) {
-							ImGui::TableSetupScrollFreeze(0, 1);
-							ImGui::TableSetupColumn("File");
+						const int UNPACK_ITEMS_COUNT = gdata.viewingArchiveFileList.size();
+						if (ImGui::BeginTable("Unpack Selection", 4, table_flags, { 0.0f, 16 * ImGui::GetTextLineHeightWithSpacing() })) {
+							ImGui::TableSetupColumn("File", ImGuiTableColumnFlags_WidthStretch);
 							ImGui::TableSetupColumn("Scheme");
-							ImGui::TableSetupColumn("Compressed Size");
-							ImGui::TableSetupColumn("Uncompressed Size");
+							ImGui::TableSetupColumn("Compressed");
+							ImGui::TableSetupColumn("Uncompressed");
+							ImGui::TableSetupScrollFreeze(0, 1);
 							ImGui::TableHeadersRow();
 
-							// Copied from IMGUI_DEMO_MARKER("Tables/Vertical scrolling, with clipping")
-							ImGuiListClipper clipper;
-							clipper.Begin(gdata.viewingArchiveFileList.size());
-							while (clipper.Step()) {
-								for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
-									const q4b::ArchivedFileHeader& file_header = gdata.viewingArchiveFileList[row];
-									ImGui::TableNextRow();
-									ImGui::TableSetColumnIndex(0);
-									ImGui::TextUnformatted(file_header.path);
-									ImGui::TableNextColumn();
-									ImGui::TextUnformatted(q4b::SchemeToDisplayStr(file_header.compression_type));
-									ImGui::TableNextColumn();
-									ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
-									ImGui::TableNextColumn();
-									ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
+							const ImGuiMultiSelectFlags selection_flags = ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
+							ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(selection_flags, unpack_selection.Size, UNPACK_ITEMS_COUNT);
+							unpack_selection.ApplyRequests(ms_io);
+
+							for (int n = 0; n < UNPACK_ITEMS_COUNT; n++)
+							{
+								const q4b::ArchivedFileHeader& file_header = gdata.viewingArchiveFileList[n];
+								ImGui::TableNextRow();
+								ImGui::TableNextColumn();
+								ImGui::PushID(n);
+								bool item_is_selected = unpack_selection.Contains((ImGuiID)n);
+								ImGui::SetNextItemSelectionUserData(n);
+
+								if (file_header.pathIsValid()) {
+									ImGui::Selectable(file_header.path, &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
+								} else {
+									ImGui::PushStyleColor(ImGuiCol_Text, { 1.0f, 0.0f, 0.0f, 1.0f });
+									ImGui::Selectable("INVALID", &item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
+									ImGui::PopStyleColor();
 								}
+
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(q4b::SchemeToDisplayStr(file_header.compression_type));
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
+								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
+								ImGui::PopID();
 							}
+
+							ms_io = ImGui::EndMultiSelect();
+							unpack_selection.ApplyRequests(ms_io);
 							ImGui::EndTable();
 						}
+						ImGui::Text("Selection: %i/%i", unpack_selection.Size, UNPACK_ITEMS_COUNT);
 					}
 					if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 
-					ImGui::SeparatorText("Unpack Everything");
+					ImGui::SeparatorText("Unpack");
 
 					if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
@@ -527,12 +550,30 @@ int main(int argc, char** argv)
 					if (THREAD_IS_WORKING) {
 						GuiCompressionProgressBar();
 					} else {
-						if (ImGui::Button("Unpack Archive")) {
+						if (!gdata.viewingArchive) { ImGui::BeginDisabled(); }
+						if (ImGui::Button("Unpack Selected")) {
+							gdata.selectedArchiveFileList.clear();
+							gdata.selectedArchiveFileList.reserve(unpack_selection.Size);
+							void* it = nullptr;
+							ImGuiID id;
+							while (unpack_selection.GetNextSelectedItem(&it, &id))
+								gdata.selectedArchiveFileList.push_back(gdata.viewingArchiveFileList[(int)id]);
+
 							gdata.messages.clear();
 							thread_files_completed.store(0);
 							thread_func_exit_early.store(false);
 							thread_func_working.store(true);
-							std::thread t(q4b::UnpackArchive_internal<true>, archive_file_path, output_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+							std::thread t(q4b::UnpackArchive_internal<true>, archive_file_path, gdata.selectedArchiveFileList, output_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
+							t.detach();
+						}
+						ImGui::Button("Unpack Selected without decompressing (TODO)");
+						if (!gdata.viewingArchive) { ImGui::EndDisabled(); }
+						if (ImGui::Button("Unpack Everything")) {
+							gdata.messages.clear();
+							thread_files_completed.store(0);
+							thread_func_exit_early.store(false);
+							thread_func_working.store(true);
+							std::thread t(q4b::UnpackArchive_internal<true>, archive_file_path, gdata.viewingArchiveFileList, output_file_path, &gdata.messages, &thread_func_working, &thread_func_exit_early, &thread_files_completed);
 							t.detach();
 						}
 					}

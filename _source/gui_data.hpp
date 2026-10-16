@@ -9,6 +9,7 @@ struct GuiData {
 	bool viewingArchive = false;
 	q4b::ArchiveHeader viewingArchiveHeader;
 	std::vector<q4b::ArchivedFileHeader> viewingArchiveFileList;
+	std::vector<q4b::ArchivedFileHeader> selectedArchiveFileList;
 	std::vector<q4b::ErrorMessage> messages;
 	int threadCount;
 	static int threadCountMax;
