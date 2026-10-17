@@ -225,11 +225,12 @@ int main(int argc, char** argv)
 
 			const int ARCHIVE_ITEMS_COUNT = FILE_LIST.size();
 			ImGui::Text("Selection: %i/%i", archive_selection.Size, ARCHIVE_ITEMS_COUNT);
-			if (ImGui::BeginTable("Archive Selection", 4, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
+			if (ImGui::BeginTable("Archive Selection", 5, table_flags, { 0.0f, ImGui::GetFontSize() * 20 })) {
 				ImGui::TableSetupColumn("File", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Scheme");
 				ImGui::TableSetupColumn("Level");
 				ImGui::TableSetupColumn("Size");
+				ImGui::TableSetupColumn("Offset");
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
 
@@ -253,12 +254,12 @@ int main(int argc, char** argv)
 
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(q4b::SchemeToDisplayStr(FILE_LIST[n].data.compression_type));
-
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].compression_level).c_str());
-
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.uncompressed_size).c_str());
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.offset).c_str());
 
 					ImGui::PopID();
 				}
@@ -387,11 +388,11 @@ int main(int argc, char** argv)
 				if (!rootDirIsLocked) { ImGui::EndDisabled(); }
 			};
 
-			static auto GuiCompressionProgressBar = [&] () -> void {
+			static auto GuiCompressionProgressBar = [&] (unsigned int FILE_COUNT) -> void {
 				const unsigned int files_completed = thread_files_completed.load(std::memory_order_relaxed);
-				const float progress = float(files_completed) / float(FILE_LIST.size());
+				const float progress = float(files_completed) / float(FILE_COUNT);
 				char buf[32];
-				sprintf(buf, "%u/%zu", files_completed, FILE_LIST.size());
+				sprintf(buf, "%u/%u", files_completed, FILE_COUNT);
 				ImGui::ProgressBar(progress, { 0.0f, 0.0f }, buf);
 
 				const bool EXIT_EARLY = thread_func_exit_early.load(std::memory_order_acquire);
@@ -424,7 +425,7 @@ int main(int argc, char** argv)
 
 					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 					if (THREAD_IS_WORKING) {
-						GuiCompressionProgressBar();
+						GuiCompressionProgressBar(FILE_LIST.size());
 					} else {
 						if (ImGui::Button("Create Archive")) {
 							gdata.messages.clear();
@@ -472,7 +473,6 @@ int main(int argc, char** argv)
 						ImGui::SameLine();
 						if (ImGui::Button("Stop Viewing")) {
 							gdata.viewingArchive = false;
-							unpack_selection.Clear();
 						}
 						if (THREAD_IS_WORKING) { ImGui::BeginDisabled(); }
 
@@ -493,9 +493,10 @@ int main(int argc, char** argv)
 						ImGui::TextUnformatted(std::to_string(gdata.viewingArchiveHeader.num_files).c_str());
 
 						const int UNPACK_ITEMS_COUNT = gdata.viewingArchiveFileList.size();
-						if (ImGui::BeginTable("Unpack Selection", 4, table_flags, { 0.0f, 16 * ImGui::GetTextLineHeightWithSpacing() })) {
+						if (ImGui::BeginTable("Unpack Selection", 5, table_flags, { 0.0f, 16 * ImGui::GetTextLineHeightWithSpacing() })) {
 							ImGui::TableSetupColumn("File", ImGuiTableColumnFlags_WidthStretch);
 							ImGui::TableSetupColumn("Scheme");
+							ImGui::TableSetupColumn("Offset");
 							ImGui::TableSetupColumn("Compressed");
 							ImGui::TableSetupColumn("Uncompressed");
 							ImGui::TableSetupScrollFreeze(0, 1);
@@ -525,6 +526,8 @@ int main(int argc, char** argv)
 								ImGui::TableNextColumn();
 								ImGui::TextUnformatted(q4b::SchemeToDisplayStr(file_header.compression_type));
 								ImGui::TableNextColumn();
+								ImGui::TextUnformatted(std::to_string(file_header.offset).c_str());
+								ImGui::TableNextColumn();
 								ImGui::TextUnformatted(std::to_string(file_header.compressed_size).c_str());
 								ImGui::TableNextColumn();
 								ImGui::TextUnformatted(std::to_string(file_header.uncompressed_size).c_str());
@@ -548,7 +551,7 @@ int main(int argc, char** argv)
 					if (THREAD_IS_WORKING) { ImGui::EndDisabled(); }
 
 					if (THREAD_IS_WORKING) {
-						GuiCompressionProgressBar();
+						GuiCompressionProgressBar(unpack_selection.Size);
 					} else {
 						if (!gdata.viewingArchive) { ImGui::BeginDisabled(); }
 						if (ImGui::Button("Unpack Selected")) {
@@ -608,7 +611,7 @@ int main(int argc, char** argv)
 
 					if (!rootDirIsLocked) { ImGui::BeginDisabled(); }
 					if (THREAD_IS_WORKING) {
-						GuiCompressionProgressBar();
+						GuiCompressionProgressBar(FILE_LIST.size());
 					} else {
 						if (ImGui::Button("Compress Files")) {
 							gdata.messages.clear();

@@ -376,6 +376,13 @@ void WriteArchive_internal(
 		}
 	}
 
+	// Calculate offsets
+	size_t file_offset = sizeof(ArchiveHeader) + file_list.size() * sizeof(ArchivedFileHeader);
+	for (auto& [header, f] : compressed_files_data) {
+		header.offset = file_offset;
+		file_offset += header.compressed_size;
+	}
+
 	// Write archive
 	ArchiveHeader ah;
 	ah.num_files = file_list.size();
@@ -457,9 +464,16 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 		messages->push_back({ ErrorSeverity::error, "File isn't a Q4B archive" });
 		return {};
 	}
+	if (ah.version < Q4B_ARCHIVE_VERSION) {
+		messages->push_back({ ErrorSeverity::error, "Old archive version" });
+		return {};
+	} else if (ah.version >= Q4B_VERSION_GEN(1, 0)) {
+		messages->push_back({ ErrorSeverity::error, "Unknown archive version" });
+		return {};
+	}
 	if (!ah.verifyHash()) {
 		messages->push_back({ ErrorSeverity::error, "Archive hash was incorrect" });
-		// return {};
+		return {};
 	}
 	if (ah.num_files == 0) [[unlikely]] {
 		// Exit early
@@ -467,15 +481,13 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 	}
 
 	// Read file headers
+	if (archiveSize < sizeof(ArchiveHeader) + ah.num_files * sizeof(ArchivedFileHeader)) {
+		messages->push_back({ ErrorSeverity::error, "Archive is too small for every file header" });
+		return {};
+	}
+
 	std::vector<ArchivedFileHeader> headers(ah.num_files);
-	size_t file_offset = sizeof(ArchiveHeader);
-
 	for (int i = 0; i < ah.num_files; i++) {
-		if (archiveSize < file_offset + sizeof(ArchivedFileHeader)) {
-			messages->push_back({ ErrorSeverity::error, "Archive is too small for every file header" });
-			return {};
-		}
-
 		ArchivedFileHeader& file_header = headers[i];
 		archive.read((char*)(&file_header), sizeof(ArchivedFileHeader));
 		bytesRead = archive.gcount();
@@ -484,7 +496,6 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 			return {};
 		}
 		SwapEndiannessIfNeeded(file_header);
-		file_offset += sizeof(ArchivedFileHeader);
 	}
 
 	// Decompress files
@@ -496,39 +507,24 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 				return decompressed_files_data;
 			}
 
-		if (archiveSize < file_offset + headers[i].compressed_size) {
-			messages->push_back({ ErrorSeverity::error, "Archive is too small for every compressed file" });
-			return decompressed_files_data;
-		}
-
 		if (!headers[i].pathIsValid()) {
 			//TODO: doesn't this also have to check for duplicate filepaths?
 			messages->push_back({ ErrorSeverity::error, "Invalid path for file idx " + std::to_string(i) });
-			archive.seekg(headers[i].compressed_size, std::ios::cur);
-			if (!archive) {
-				messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
-				return decompressed_files_data;
-			}
-			file_offset += headers[i].compressed_size;
 			continue;
 		}
 
-		bool fileInList = false;
-		for (const auto& file : input_list) {
-			if (std::equal(headers[i].path, headers[i].path + Q4B_MAX_PATH, file.path)) {
-				fileInList = true;
-				break;
-			}
+		if (std::none_of(input_list.begin(), input_list.end(), [&headers, &i](const auto& file) {
+			return std::equal(headers[i].path, headers[i].path + Q4B_MAX_PATH, file.path);
+		})) {
 			//TODO: need to push a message for files that aren't in the archive
-		}
-		if (!fileInList) {
-			archive.seekg(headers[i].compressed_size, std::ios::cur);
-			if (!archive) {
-				messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
-				return decompressed_files_data;
-			}
-			file_offset += headers[i].compressed_size;
 			continue;
+		}
+
+		archive.seekg(headers[i].offset, std::ios::beg);
+		// If seeking past the file's size, the read() will fail, but the seekg() won't
+		if (!archive) {
+			messages->push_back({ ErrorSeverity::error, "Failed to read archive" });
+			return decompressed_files_data;
 		}
 
 		char* compressedFile = new char[headers[i].compressed_size];
@@ -539,13 +535,13 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 			delete[] compressedFile;
 			return decompressed_files_data;
 		}
-		file_offset += headers[i].compressed_size;
 
 		ArchivedFileHeader file_header;
 		std::memcpy(file_header.path, headers[i].path, Q4B_MAX_PATH);
 		file_header.compression_type = headers[i].compression_type;
 		file_header.compressed_size = headers[i].compressed_size;
 		file_header.flags = 0;
+		file_header.offset = 0;
 
 		if (headers[i].compression_type == CompressionScheme::Uncompressed) {
 			file_header.uncompressed_size = file_header.compressed_size;
@@ -716,15 +712,22 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 	}
 	SwapEndiannessIfNeeded(header);
 
+	if (header.version < Q4B_ARCHIVE_VERSION) {
+		return false;
+	} else if (header.version >= Q4B_VERSION_GEN(1, 0)) {
+		return false;
+	}
+	if (!header.verifyHash()) {
+		return false;
+	}
+
 	// Read file headers
-	std::vector<ArchivedFileHeader> headers(header.num_files);
-	size_t file_offset = sizeof(ArchiveHeader);
+	if (archiveSize < sizeof(ArchiveHeader) + header.num_files * sizeof(ArchivedFileHeader)) {
+		return false;
+	}
 
+	list.reserve(header.num_files);
 	for (int i = 0; i < header.num_files; i++) {
-		if (archiveSize < file_offset + sizeof(ArchivedFileHeader)) {
-			return false;
-		}
-
 		ArchivedFileHeader file_header;
 		archive.read((char*)(&file_header), sizeof(ArchivedFileHeader));
 		bytesRead = archive.gcount();
@@ -733,7 +736,6 @@ bool ReadArchiveHeader(const std::filesystem::path& input, ArchiveHeader& header
 		}
 		SwapEndiannessIfNeeded(file_header);
 		list.push_back(file_header);
-		file_offset += sizeof(ArchivedFileHeader);
 	}
 
 	return true;

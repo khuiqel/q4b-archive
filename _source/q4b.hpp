@@ -21,7 +21,7 @@ inline constexpr uint32_t Q4B_VERSION_GEN(int major, int minor) {
 	return major*1000 + minor;
 }
 
-constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 1);
+constexpr uint32_t Q4B_ARCHIVE_VERSION = Q4B_VERSION_GEN(0, 2);
 constexpr int Q4B_MAX_PATH = 256;
 constexpr char MAGIC_NUM[8] = "Q4B_YAY";
 
@@ -109,7 +109,7 @@ struct ArchivedFileHeader {
 	CompressionScheme compression_type;
 	uint64_t compressed_size;
 	uint64_t uncompressed_size;
-	//uint64_t offset; //TODO: offset from start of archive to compressed data
+	uint64_t offset;
 	XXH64_hash_t compressed_hash;
 	XXH64_hash_t uncompressed_hash;
 	//TODO: self_hash?
@@ -139,7 +139,7 @@ struct ArchivedFileHeader {
 	 */
 	void setPath(const std::string& path);
 };
-static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8));
+static_assert(sizeof(ArchivedFileHeader) == (Q4B_MAX_PATH+4+4+8+8+8+8+8));
 static_assert(std::is_trivially_copyable<ArchivedFileHeader>::value);
 
 #pragma pack(pop)

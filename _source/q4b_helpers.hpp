@@ -32,6 +32,7 @@ struct CompressionFile {
 		data.setPath("");
 		data.compression_type = CompressionScheme::Uncompressed;
 		data.flags = 0;
+		data.offset = 0;
 		compression_level = 0;
 		compression_flags = Q4B_CompressionFileFlags::None;
 	}
@@ -39,6 +40,7 @@ struct CompressionFile {
 		data.setPath(file.string());
 		data.compression_type = compression_type_;
 		data.flags = 0;
+		data.offset = 0;
 		compression_level = compression_level_;
 		compression_flags = Q4B_CompressionFileFlags::None;
 	}
@@ -74,6 +76,7 @@ inline void SwapEndiannessIfNeeded(ArchivedFileHeader& header) {
 	header.compression_type  = (CompressionScheme)ConvertHostEndianToLittleEndian((uint32_t)header.compression_type);
 	header.compressed_size   = ConvertHostEndianToLittleEndian(header.compressed_size);
 	header.uncompressed_size = ConvertHostEndianToLittleEndian(header.uncompressed_size);
+	header.offset            = ConvertHostEndianToLittleEndian(header.offset);
 	header.compressed_hash   = ConvertHostEndianToLittleEndian(header.compressed_hash);
 	header.uncompressed_hash = ConvertHostEndianToLittleEndian(header.uncompressed_hash);
 }
