@@ -272,14 +272,24 @@ void WriteCompressedFiles_internal(
 	// Write files
 	for (auto& [header, f] : compressed_files_data) {
 		CompressionSchemeInfo* info = SchemeToInfo(header.compression_type);
-		const std::string output = (output_dir / std::filesystem::path(header.path).filename()).string() + info->fileExtensions[0];
-		std::ofstream outfile(output, std::ios::binary);
+		const std::string output_path = (output_dir / std::filesystem::path(header.path).filename()).string() + info->fileExtensions[0];
+
+		std::ofstream outfile(output_path, std::ios::binary);
+		if (!outfile) {
+			messages->push_back({ ErrorSeverity::error, "Couldn't create \"" + output_path + "\"" });
+			continue;
+		}
+
 		outfile.write((const char*)f, header.compressed_size);
+		if (!outfile) {
+			messages->push_back({ ErrorSeverity::error, "Couldn't write to \"" + output_path + "\"" });
+			continue;
+		}
 	}
 
 	// Cleanup
 	for (int i = 0; i < file_list.size(); i++) {
-		// The pointer can only be nullptr if there was an error
+		// The pointer can only be nullptr if there was an error during compression
 		delete[] compressed_files_data[i].second;
 	}
 	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
@@ -384,31 +394,50 @@ void WriteArchive_internal(
 	}
 
 	// Write archive
-	ArchiveHeader ah;
-	ah.num_files = file_list.size();
-	ah.computeHash();
-	SwapEndiannessIfNeeded(ah);
-	outfile.write((const char*)&ah, sizeof(ah));
+	do {
+		ArchiveHeader ah;
+		ah.num_files = file_list.size();
+		ah.computeHash();
+		SwapEndiannessIfNeeded(ah);
+		outfile.write((const char*)&ah, sizeof(ah));
+		if (!outfile) {
+			messages->push_back({ ErrorSeverity::error, "Could not write to file" });
+			break;
+		}
 
-	for (auto& [header, f] : compressed_files_data) {
-		SwapEndiannessIfNeeded(header);
-		outfile.write((const char*)&header, sizeof(header));
-	}
-	for (auto& [header, f] : compressed_files_data) {
-		outfile.write((const char*)f, header.compressed_size);
-	}
+		bool exitNow = false;
+		for (auto& [header, f] : compressed_files_data) {
+			SwapEndiannessIfNeeded(header);
+			outfile.write((const char*)&header, sizeof(header));
+			if (!outfile) {
+				messages->push_back({ ErrorSeverity::error, "Could not write to file" });
+				exitNow = true;
+				break;
+			}
+		}
+		if (exitNow) { break; }
+		for (auto& [header, f] : compressed_files_data) {
+			outfile.write((const char*)f, header.compressed_size);
+			if (!outfile) {
+				messages->push_back({ ErrorSeverity::error, "Could not write to file" });
+				exitNow = true;
+				break;
+			}
+		}
+		if (exitNow) { break; }
 
-	outfile.close();
-	std::error_code ec;
-	std::filesystem::rename(output_tmp, output, ec);
-	if (ec) {
-		messages->push_back({ ErrorSeverity::error, "Could not convert the temp file to real file" });
-		// std::filesystem::remove(output_tmp);
-	}
+		outfile.close();
+		std::error_code ec;
+		std::filesystem::rename(output_tmp, output, ec);
+		if (ec) {
+			messages->push_back({ ErrorSeverity::error, "Could not convert the temp file to real file" });
+			// std::filesystem::remove(output_tmp);
+		}
+	} while (false);
 
 	// Cleanup
 	for (int i = 0; i < file_list.size(); i++) {
-		// The pointer can only be nullptr if there was an error
+		// The pointer can only be nullptr if there was an error during compression
 		delete[] compressed_files_data[i].second;
 	}
 	if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
@@ -510,6 +539,15 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 		if (!headers[i].pathIsValid()) {
 			//TODO: doesn't this also have to check for duplicate filepaths?
 			messages->push_back({ ErrorSeverity::error, "Invalid path for file idx " + std::to_string(i) });
+			continue;
+		}
+
+		if (headers[i].offset < sizeof(ArchiveHeader) + ah.num_files * sizeof(ArchivedFileHeader)) {
+			messages->push_back({ ErrorSeverity::error, "Invalid offset for file idx " + std::to_string(i) });
+			continue;
+		}
+		if (headers[i].offset + headers[i].compressed_size > archiveSize) {
+			messages->push_back({ ErrorSeverity::error, "Archive too small for file idx " + std::to_string(i) });
 			continue;
 		}
 
@@ -656,17 +694,17 @@ void UnpackArchive_internal(
 			continue;
 		}
 
-		const std::filesystem::path output_path = output / filename;
+		const std::string output_path = (output / filename).string();
 		std::ofstream outfile(output_path, std::ios::binary);
 		if (!outfile) {
-			messages->push_back({ ErrorSeverity::error, "Couldn't create \"" + output_path.string() + "\"" });
+			messages->push_back({ ErrorSeverity::error, "Couldn't create \"" + output_path + "\"" });
 			delete[] f;
 			continue;
 		}
 
 		outfile.write((const char*)f, header.uncompressed_size);
 		if (!outfile) {
-			messages->push_back({ ErrorSeverity::error, "Couldn't write to \"" + output_path.string() + "\"" });
+			messages->push_back({ ErrorSeverity::error, "Couldn't write to \"" + output_path + "\"" });
 			delete[] f;
 			continue;
 		}
