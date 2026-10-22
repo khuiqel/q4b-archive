@@ -164,7 +164,7 @@ endif()
 find_package(SDL3 3.4.0 REQUIRED COMPONENTS video render OPTIONAL_COMPONENTS gpu joystick)
 find_package(lz4 1.8.0 REQUIRED)
 find_package(zstd 1.5.0 REQUIRED)
-find_package(brotli 1.1.0 REQUIRED)
+find_package(brotli 1.1.1 REQUIRED)
 find_package(snappy 1.2.1 REQUIRED)
 #]]
 
