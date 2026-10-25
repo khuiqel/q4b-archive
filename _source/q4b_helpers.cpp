@@ -138,6 +138,8 @@ std::vector<std::pair<ArchivedFileHeader, char*>> CompressFiles_internal(
 		file_header.compression_type = file.data.compression_type;
 		file_header.uncompressed_size = file_size;
 		file_header.flags = 0;
+		if constexpr (!GenericExport)
+			file_header.offset = file.data.offset;
 
 		if (file.data.compression_type == CompressionScheme::Uncompressed) {
 			file_header.compressed_size = file_header.uncompressed_size;
@@ -309,7 +311,7 @@ void WriteArchive_internal(
 	int threadCount, std::vector<ErrorMessage>* messages,
 	std::atomic_bool* working_flag, const std::atomic_bool* exit_flag, std::atomic_int* files_completed) noexcept
 {
-	// Check for valid paths and duplicate paths
+	// Check for valid paths, duplicate paths, and large enough offsets
 	// Valid schemes and existence are checked in CompressFiles_internal()
 	{
 		bool allFilesExist = true;
@@ -340,6 +342,19 @@ void WriteArchive_internal(
 			}
 		}
 		if (duplicatesExist) {
+			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
+			return;
+		}
+
+		bool offsetsAreLargeEnough = true;
+		for (int i = 0; i < file_list.size(); i++) {
+			const uint64_t offset = file_list[i].data.offset;
+			if (offset != 0 && offset < sizeof(ArchiveHeader) + file_list.size() * sizeof(ArchivedFileHeader)) {
+				messages->push_back({ ErrorSeverity::error, std::string(file_list[i].data.path) + " has an offset too small: " + std::to_string(offset) });
+				offsetsAreLargeEnough = false;
+			}
+		}
+		if (!offsetsAreLargeEnough) {
 			if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
 			return;
 		}
@@ -386,17 +401,61 @@ void WriteArchive_internal(
 		}
 	}
 
-	// Calculate offsets
-	size_t file_offset = sizeof(ArchiveHeader) + file_list.size() * sizeof(ArchivedFileHeader);
-	for (auto& [header, f] : compressed_files_data) {
-		header.offset = file_offset;
-		file_offset += header.compressed_size;
+	// Determine if any files will overlap
+	// (Technically, should check if the offsets were modified by CompressFiles_internal(), but it doesn't, so don't check again)
+	struct RegionData { uint64_t start; uint64_t end; size_t index; };
+	size_t index = 0;
+	std::vector<RegionData> regions; regions.reserve(compressed_files_data.size());
+	std::transform(compressed_files_data.begin(), compressed_files_data.end(),
+		std::back_inserter(regions),
+		[&index](const std::pair<ArchivedFileHeader, char*>& file) {
+			return RegionData{ file.first.offset, file.first.offset + file.first.compressed_size, index++ };
+		}
+	);
+	std::sort(regions.begin(), regions.end(), [](const auto& lhs, const auto& rhs) {
+		return lhs.start < rhs.start;
+	});
+	if (compressed_files_data.size() > 0) {
+		uint64_t currentEnd = regions[0].start == 0 ? 0 : regions[0].end;
+		for (int i = 1; i < regions.size(); i++) {
+			if (regions[i].start == 0) {
+				continue;
+			}
+			if (regions[i].start < currentEnd) {
+				messages->push_back({ ErrorSeverity::error, "Compressed files will overlap" });
+				for (auto& [header, f] : compressed_files_data) {
+					if (f) delete[] f;
+				}
+				if constexpr (extraFeatures) working_flag->store(false, std::memory_order_release);
+				return;
+			}
+			currentEnd = regions[i].end;
+		}
 	}
 
+	// Calculate leftover offsets
+	size_t file_offset = sizeof(ArchiveHeader) + regions.size() * sizeof(ArchivedFileHeader);
+	file_offset = regions.size() == 0 ? file_offset : (regions[regions.size()-1].start == 0 ? file_offset : regions[regions.size()-1].end);
+	for (RegionData& r : regions) {
+		if (r.start == 0) {
+			r.start = file_offset;
+			r.end += file_offset;
+			file_offset += r.end - r.start;
+			compressed_files_data[r.index].first.offset = r.start;
+		} else {
+			break;
+		}
+	}
+	std::sort(regions.begin(), regions.end(), [](const auto& lhs, const auto& rhs) {
+		//TODO: could sort only the beginning then merge
+		return lhs.start < rhs.start;
+	});
+
 	// Write archive
+	static constexpr char ZEROS[4*1024] = {0};
 	do {
 		ArchiveHeader ah;
-		ah.num_files = file_list.size();
+		ah.num_files = compressed_files_data.size();
 		ah.computeHash();
 		SwapEndiannessIfNeeded(ah);
 		outfile.write((const char*)&ah, sizeof(ah));
@@ -416,13 +475,40 @@ void WriteArchive_internal(
 			}
 		}
 		if (exitNow) { break; }
-		for (auto& [header, f] : compressed_files_data) {
-			outfile.write((const char*)f, header.compressed_size);
+
+		// Loop through regions because it's sorted
+		file_offset = sizeof(ArchiveHeader) + regions.size() * sizeof(ArchivedFileHeader);
+		for (const RegionData& r : regions) {
+			// Write filler zeros
+			while (file_offset + std::size(ZEROS) < r.start) {
+				outfile.write(ZEROS, std::size(ZEROS));
+				if (!outfile) {
+					messages->push_back({ ErrorSeverity::error, "Could not write to file" });
+					exitNow = true;
+					break;
+				}
+				file_offset += std::size(ZEROS);
+			}
+			if (exitNow) { break; }
+			if (file_offset < r.start) {
+				outfile.write(ZEROS, r.start - file_offset);
+				if (!outfile) {
+					messages->push_back({ ErrorSeverity::error, "Could not write to file" });
+					exitNow = true;
+					break;
+				}
+				file_offset = r.start;
+			}
+			if (exitNow) { break; }
+
+			// Write data
+			outfile.write((const char*)compressed_files_data[r.index].second, r.end - r.start);
 			if (!outfile) {
 				messages->push_back({ ErrorSeverity::error, "Could not write to file" });
 				exitNow = true;
 				break;
 			}
+			file_offset = r.end;
 		}
 		if (exitNow) { break; }
 
@@ -436,7 +522,7 @@ void WriteArchive_internal(
 	} while (false);
 
 	// Cleanup
-	for (int i = 0; i < file_list.size(); i++) {
+	for (int i = 0; i < compressed_files_data.size(); i++) {
 		// The pointer can only be nullptr if there was an error during compression
 		delete[] compressed_files_data[i].second;
 	}
@@ -579,7 +665,7 @@ std::vector<std::pair<ArchivedFileHeader, char*>> DecompressArchive_internal(
 		file_header.compression_type = headers[i].compression_type;
 		file_header.compressed_size = headers[i].compressed_size;
 		file_header.flags = 0;
-		file_header.offset = 0;
+		file_header.offset = 0; // Not needed
 
 		if (headers[i].compression_type == CompressionScheme::Uncompressed) {
 			file_header.uncompressed_size = file_header.compressed_size;

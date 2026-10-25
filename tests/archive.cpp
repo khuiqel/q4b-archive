@@ -252,6 +252,52 @@ TEST(WriteArchive, ThreeFilesDuplicateFail) {
 	EXPECT_TRUE(messages[1].severity == q4b::ErrorSeverity::error);
 }
 
+TEST(WriteArchive, TwoFilesUncompressedWithOffset1) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+
+	std::vector<q4b::ErrorMessage> messages;
+	const size_t file1_offset = sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader);
+	const size_t file2_offset = sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE);
+	constexpr int zero_padding = 100;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0, file1_offset }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0, file2_offset + zero_padding } };
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE) + std::filesystem::file_size(TEST_FILE_2) + zero_padding);
+
+	// Verify the padded space is all zero
+	char* file_data;
+	int64_t file_size = q4b::LoadFileIntoMemory(TEST_ARCHIVE_PATH, &file_data);
+	ASSERT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), file_size);
+	EXPECT_TRUE(std::all_of(file_data + file2_offset, file_data + file2_offset + zero_padding, [](char val) { return val == 0; }));
+	delete[] file_data;
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+}
+
+TEST(WriteArchive, TwoFilesUncompressedWithOffset2) {
+	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }
+
+	std::vector<q4b::ErrorMessage> messages;
+	const size_t file_offset = sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader);
+	constexpr int zero_padding = 100;
+	std::vector<q4b::CompressionFile> files = { { TEST_FILE, q4b::CompressionScheme::Uncompressed, 0 }, { TEST_FILE_2, q4b::CompressionScheme::Uncompressed, 0, file_offset + zero_padding } };
+	q4b::WriteArchive(files, ".", TEST_ARCHIVE_PATH, THREAD_COUNT, &messages);
+
+	ASSERT_TRUE(std::filesystem::exists(TEST_ARCHIVE_PATH));
+	EXPECT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), sizeof(q4b::ArchiveHeader) + 2*sizeof(q4b::ArchivedFileHeader) + std::filesystem::file_size(TEST_FILE) + std::filesystem::file_size(TEST_FILE_2) + zero_padding);
+
+	// Verify the padded space is all zero
+	char* file_data;
+	int64_t file_size = q4b::LoadFileIntoMemory(TEST_ARCHIVE_PATH, &file_data);
+	ASSERT_EQ(std::filesystem::file_size(TEST_ARCHIVE_PATH), file_size);
+	EXPECT_TRUE(std::all_of(file_data + file_offset, file_data + file_offset + zero_padding, [](char val) { return val == 0; }));
+	delete[] file_data;
+
+	std::filesystem::remove(TEST_ARCHIVE_PATH);
+}
+
+
 #ifdef Q4B_ENABLE_LZ4
 TEST(WriteArchiveAndUnpack, OneFileLz4) {
 	if (std::filesystem::exists(TEST_ARCHIVE_PATH)) { std::filesystem::remove(TEST_ARCHIVE_PATH); }

@@ -36,11 +36,11 @@ struct CompressionFile {
 		compression_level = 0;
 		compression_flags = Q4B_CompressionFileFlags::None;
 	}
-	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_) {
+	CompressionFile(const std::filesystem::path& file, CompressionScheme compression_type_, int32_t compression_level_, uint64_t offset_ = 0) {
 		data.setPath(file.string());
 		data.compression_type = compression_type_;
 		data.flags = 0;
-		data.offset = 0;
+		data.offset = offset_;
 		compression_level = compression_level_;
 		compression_flags = Q4B_CompressionFileFlags::None;
 	}
