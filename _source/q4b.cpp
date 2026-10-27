@@ -42,8 +42,8 @@ bool ArchivedFileHeader::pathIsValid() const {
 	}
 
 	// No NTFS-invalid characters
-	constexpr char NTFS_LIST[] = { ':', '*', '\"', '?', '<', '>', '|' };
-	if (std::any_of(path, path + Q4B_MAX_PATH, [&NTFS_LIST](auto val) { return std::find(NTFS_LIST, NTFS_LIST + std::size(NTFS_LIST), val) != NTFS_LIST + std::size(NTFS_LIST); })) {
+	static constexpr char NTFS_LIST[] = { ':', '*', '\"', '?', '<', '>', '|' };
+	if (std::any_of(path, path + Q4B_MAX_PATH, [](auto val) { return std::find(NTFS_LIST, NTFS_LIST + std::size(NTFS_LIST), val) != NTFS_LIST + std::size(NTFS_LIST); })) {
 		return false;
 	}
 
@@ -52,7 +52,7 @@ bool ArchivedFileHeader::pathIsValid() const {
 
 void ArchivedFileHeader::setPath(const std::string& path) {
 	const std::string p = path;
-	size_t charCount = std::min(p.size(), size_t(Q4B_MAX_PATH-1));
+	const size_t charCount = std::min(p.size(), size_t(Q4B_MAX_PATH-1));
 	std::copy(p.begin(), p.begin() + charCount, this->path);
 	std::replace(this->path, this->path + charCount, '\\', '/');
 	std::fill(this->path + charCount, this->path + Q4B_MAX_PATH, '\0');

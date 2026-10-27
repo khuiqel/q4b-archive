@@ -1,13 +1,15 @@
-#include <iostream>
-#include <CLI/CLI.hpp>
-#include <filesystem>
-#include <fstream>
-#include <climits> // INT_MAX
 #include <charconv> // std::from_chars
 #include <chrono>
-#include "q4b_helpers.hpp"
+#include <climits> // INT_MAX
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+#include <CLI/CLI.hpp>
+
 #include "app/compression_info.hpp"
 #include "lib/compression_data.hpp"
+#include "q4b_helpers.hpp"
 
 static void WriteFile(const std::filesystem::path& output, const char* data, size_t size) {
 	std::ofstream o(output, std::ios::binary);

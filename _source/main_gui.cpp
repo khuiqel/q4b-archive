@@ -259,7 +259,10 @@ int main(int argc, char** argv)
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.uncompressed_size).c_str());
 					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.offset).c_str());
+					static constexpr uint64_t min = 0;
+					static constexpr uint64_t max = (uint64_t)-1ll;
+					ImGui::SliderScalar(("##slider" + std::to_string(n)).c_str(), ImGuiDataType_U64, &FILE_LIST[n].data.offset, &min, &max, nullptr, 0);
+					// ImGui::TextUnformatted(std::to_string(FILE_LIST[n].data.offset).c_str());
 
 					ImGui::PopID();
 				}

@@ -55,6 +55,9 @@ if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		# ARM: These can probably be unconditionally enabled:
 		set(SNAPPY_HAVE_NEON_CRC32 OFF CACHE BOOL "" FORCE)
 		set(SNAPPY_HAVE_NEON OFF CACHE BOOL "" FORCE)
+		# RISC-V: MSVC doesn't support this but setting these reduces CMake's workload:
+		set(SNAPPY_RVV_1 OFF CACHE BOOL "" FORCE)
+		set(SNAPPY_RVV_0_7 OFF CACHE BOOL "" FORCE)
 	endif()
 	# More macros since MSVC doesn't define them:
 	add_compile_definitions(__SSE__=1)
@@ -194,9 +197,9 @@ if(WIN32)
 endif()
 # Visual Studio startup project:
 if(Q4B_ENABLE_GUI)
-	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
-else()
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_GUI_NAME})
+else()
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 endif()
 # Visual Studio running directory set to the source root:
 set_target_properties(${PROJECT_NAME}     PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
@@ -204,13 +207,11 @@ set_target_properties(${PROJECT_GUI_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTO
 # Disable the console window:
 # set_target_properties(${PROJECT_GUI_NAME} PROPERTIES WIN32_EXECUTABLE ON)
 
-target_include_directories(${PROJECT_NAME}     PRIVATE Externals/CLI11/include)
-target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
-include_directories(PRIVATE Externals/xxHash)
+target_include_directories(${PROJECT_NAME}     PRIVATE Externals/xxHash Externals/CLI11/include)
+target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/xxHash Externals/imgui Externals/imgui/backends)
 
 target_link_libraries(${PROJECT_NAME}     PRIVATE ${Q4B_SCHEME_LIBS})
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${SDL_LIB})
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${Q4B_SCHEME_LIBS} ${SDL_LIB})
 
 
 # Tests!
@@ -231,8 +232,8 @@ add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
 
 set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
-target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
-target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE GTest::gtest_main)
+target_include_directories(${PROJECT_TESTS_NAME} PRIVATE Externals/xxHash)
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS} GTest::gtest_main)
 
 if(Q4B_ADVANCED_TESTS)
 	target_compile_definitions(${PROJECT_TESTS_NAME} Q4B_ADVANCED_TESTS=1)

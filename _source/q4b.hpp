@@ -3,8 +3,8 @@
  * https://github.com/ph3at/p3a-format/blob/main/p3a.h
  * License: MIT
  *
- * There are only so many ways to make a good file format, so it looks very similar because it
- * is very similar.
+ * There are only so many ways to make a good file format, so it looks very similar because
+ * it is very similar.
  * The CompressionScheme enum was explicitly matched though, to make hypothetical future
  * compatibility easier (except as a u32 instead of u64).
  */
