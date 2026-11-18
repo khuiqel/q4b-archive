@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <imgui.h>
-#include "q4b_helpers.hpp"
+#include "../q4b_helpers.hpp"
 
 struct GuiData {
 	// Archive stuff

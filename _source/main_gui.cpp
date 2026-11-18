@@ -17,8 +17,8 @@
 #include <SDL3/SDL.h>
 
 #include "q4b_helpers.hpp"
-#include "gui_data.hpp"
-#include "app/imgui_helpers.hpp"
+#include "gui/gui_data.hpp"
+#include "gui/imgui_helpers.hpp"
 #include <algorithm>
 #include <iostream>
 

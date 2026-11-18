@@ -185,7 +185,7 @@ add_executable(${PROJECT_GUI_NAME}
 	_source/lib/compression_data.cpp
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/gui_data.cpp
+	_source/gui/gui_data.cpp
 	_source/main_gui.cpp
 	${IMGUI_FILES}
 	Externals/xxHash/xxhash.c
