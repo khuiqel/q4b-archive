@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20...3.31)
 project(q4b)
 set(PROJECT_GUI_NAME ${PROJECT_NAME}-gui)
 set(PROJECT_TESTS_NAME ${PROJECT_NAME}-tests)
+set(PROJECT_LIB_NAME ${PROJECT_NAME}-lib)
 
 # Note: when changing these defaults, you have to delete CMakeCache.txt
 option(Q4B_ENABLE_LZ4    "Enable LZ4 compression and decompression" ON)
@@ -20,6 +21,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED False)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_C_STANDARD 17) # Not really needed but helps ensure builds are more consistent
+
+### Initial setup ###
 
 if(NOT CMAKE_BUILD_TYPE)
 	#options: Debug, Release, RelWithDebInfo, MinSizeRel
@@ -74,6 +77,11 @@ endif()
 set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} ${COMPILER_MARCH_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMPILER_MARCH_FLAGS}")
 
+# CMake cannot target something that hasn't been declared yet, so this has to happen now
+add_library(${PROJECT_LIB_NAME})
+
+### Add all the libraries ###
+
 if(Q4B_ENABLE_GUI)
 	set(SDL_AUDIO    OFF CACHE BOOL "" FORCE)
 	set(SDL_VIDEO    ON  CACHE BOOL "" FORCE)
@@ -116,7 +124,7 @@ if(Q4B_ENABLE_LZ4)
 
 	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS lz4_static)
-	add_compile_definitions(Q4B_ENABLE_LZ4)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_LZ4)
 endif()
 
 if(Q4B_ENABLE_ZSTD)
@@ -129,7 +137,7 @@ if(Q4B_ENABLE_ZSTD)
 
 	add_subdirectory(Externals/zstd/build/cmake EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS libzstd_static)
-	add_compile_definitions(Q4B_ENABLE_ZSTD)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_ZSTD)
 endif()
 
 if(Q4B_ENABLE_BROTLI)
@@ -139,9 +147,9 @@ if(Q4B_ENABLE_BROTLI)
 	set(BROTLI_DISABLE_TESTS ON CACHE BOOL "" FORCE)
 
 	add_subdirectory(Externals/brotli EXCLUDE_FROM_ALL)
-	include_directories(PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
+	target_include_directories(${PROJECT_LIB_NAME} PRIVATE ${BROTLI_INCLUDE_DIRS}) # Brotli doesn't add its includes automatically
 	list(APPEND Q4B_SCHEME_LIBS ${BROTLI_LIBRARIES})
-	add_compile_definitions(Q4B_ENABLE_BROTLI)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_BROTLI)
 endif()
 
 if(Q4B_ENABLE_SNAPPY)
@@ -154,12 +162,12 @@ if(Q4B_ENABLE_SNAPPY)
 
 	add_subdirectory(Externals/snappy EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS snappy)
-	add_compile_definitions(Q4B_ENABLE_SNAPPY)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_SNAPPY)
 endif()
 
 if(Q4B_ENABLE_STB)
-	include_directories(PRIVATE Externals/stb)
-	add_compile_definitions(Q4B_ENABLE_STB)
+	target_include_directories(${PROJECT_LIB_NAME} PRIVATE Externals/stb)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_STB)
 endif()
 
 # These don't work because the packages don't provide the CMake files to find their libs/dirs, or something:
@@ -171,24 +179,39 @@ find_package(brotli 1.1.1 REQUIRED)
 find_package(snappy 1.2.1 REQUIRED)
 #]]
 
-add_executable(${PROJECT_NAME}
+### Projects ###
+
+target_sources(${PROJECT_LIB_NAME} PRIVATE
 	_source/app/compression_info.cpp
 	_source/lib/compression_data.cpp
 	_source/q4b.cpp
 	_source/q4b_helpers.cpp
-	_source/main_cli.cpp
 	Externals/xxHash/xxhash.c
 )
 
+target_include_directories(${PROJECT_LIB_NAME} PUBLIC Externals/xxHash) # xxHash is used in q4b.hpp
+target_link_libraries(${PROJECT_LIB_NAME} PRIVATE ${Q4B_SCHEME_LIBS})
+
+# Disable exceptions on the lib
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	target_compile_options(${PROJECT_LIB_NAME} PRIVATE /EHs-c-)
+	target_compile_options(${PROJECT_LIB_NAME} PRIVATE /wd4530) # Disable the warning about exceptions
+	# TODO: This prints out warnings about /EHs-c- overriding the default (D9025).
+	# In typical CMake fashion, this isn't easily fixable. I think the only thing
+	# that would work is globally removing /EHsc from the flags then conditionally
+	# enabling it for the targets that use it.
+else()
+	target_compile_options(${PROJECT_LIB_NAME} PRIVATE -fno-exceptions)
+endif()
+
+add_executable(${PROJECT_NAME}
+	_source/main_cli.cpp
+)
+
 add_executable(${PROJECT_GUI_NAME}
-	_source/app/compression_info.cpp
-	_source/lib/compression_data.cpp
-	_source/q4b.cpp
-	_source/q4b_helpers.cpp
 	_source/gui/gui_data.cpp
 	_source/main_gui.cpp
 	${IMGUI_FILES}
-	Externals/xxHash/xxhash.c
 )
 
 # Executable icon:
@@ -207,14 +230,14 @@ set_target_properties(${PROJECT_GUI_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTO
 # Disable the console window:
 # set_target_properties(${PROJECT_GUI_NAME} PROPERTIES WIN32_EXECUTABLE ON)
 
-target_include_directories(${PROJECT_NAME}     PRIVATE Externals/xxHash Externals/CLI11/include)
-target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/xxHash Externals/imgui Externals/imgui/backends)
+target_include_directories(${PROJECT_NAME}     PRIVATE Externals/CLI11/include)
+target_include_directories(${PROJECT_GUI_NAME} PRIVATE Externals/imgui Externals/imgui/backends)
 
-target_link_libraries(${PROJECT_NAME}     PRIVATE ${Q4B_SCHEME_LIBS})
-target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${Q4B_SCHEME_LIBS} ${SDL_LIB})
+target_link_libraries(${PROJECT_NAME}     PRIVATE ${PROJECT_LIB_NAME})
+target_link_libraries(${PROJECT_GUI_NAME} PRIVATE ${PROJECT_LIB_NAME} ${SDL_LIB})
 
+### Tests! ##
 
-# Tests!
 if(Q4B_BUILD_TESTS)
 enable_testing()
 
@@ -222,21 +245,15 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(Externals/googletest EXCLUDE_FROM_ALL)
 
 add_executable(${PROJECT_TESTS_NAME} EXCLUDE_FROM_ALL
-	_source/app/compression_info.cpp
-	_source/lib/compression_data.cpp
-	_source/q4b.cpp
-	_source/q4b_helpers.cpp
 	tests/archive.cpp
-	Externals/xxHash/xxhash.c
 )
 
 set_target_properties(${PROJECT_TESTS_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
-target_include_directories(${PROJECT_TESTS_NAME} PRIVATE Externals/xxHash)
-target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${Q4B_SCHEME_LIBS} GTest::gtest_main)
+target_link_libraries(${PROJECT_TESTS_NAME} PRIVATE ${PROJECT_LIB_NAME} GTest::gtest_main)
 
 if(Q4B_ADVANCED_TESTS)
-	target_compile_definitions(${PROJECT_TESTS_NAME} Q4B_ADVANCED_TESTS=1)
+	target_compile_definitions(${PROJECT_TESTS_NAME} PRIVATE Q4B_ADVANCED_TESTS=1)
 endif()
 
 include(GoogleTest)
