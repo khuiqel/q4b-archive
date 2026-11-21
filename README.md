@@ -30,7 +30,6 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 	* The `CMakeLists.txt` file sets the instruction set to SSE4.2 by default. If your CPU doesn't have that, change it.
 0. `git clone --recursive -j8 <this repo>` (can change `-j8` to `-j<whatever>` or remove it)
 	* If you don't want every submodule because you don't plan on using every compression scheme, you can remove the `--recursive` then `git submodule update --init <submodule>`. Then adjust the CMake `Q4B_ENABLE_XXXX` options. At the very least, you need SDL & ImGui for the GUI, CLI11 for the CLI, GoogleTest for the tests, and xxHash (for archives).
-	* **If you want to use stb_compress with MinGW, run this:** `git apply Externals/_patches/0001-stb-fix-defines.patch`
 0. In this project's root directory: `cmake -S . -B build`
 0. Follow the OS-specific instructions below
 
@@ -144,7 +143,7 @@ GNU General Public License v3.0
 * [Zstandard](https://github.com/facebook/zstd): BSD-3-Clause or GPLv2
 * [Brotli](https://github.com/google/brotli): MIT
 * [Snappy](https://github.com/google/snappy): BSD-3-Clause
-* [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h): MIT or The Unlicense
+* [stb_compress](https://github.com/khuiqel/stb/blob/master/deprecated/stb.h): MIT or The Unlicense
 * [Noto Sans](https://notofonts.github.io/): [SIL OFL 1.1](https://openfontlicense.org/open-font-license-official-text/)
 
 ## Acknowledgments

@@ -166,7 +166,7 @@ if(Q4B_ENABLE_SNAPPY)
 endif()
 
 if(Q4B_ENABLE_STB)
-	target_include_directories(${PROJECT_LIB_NAME} PRIVATE Externals/stb)
+	target_include_directories(${PROJECT_LIB_NAME} PRIVATE Externals/stb_compress)
 	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_STB)
 endif()
 

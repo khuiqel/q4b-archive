@@ -291,37 +291,48 @@ CompressionSchemeFunctions_Snappy::~CompressionSchemeFunctions_Snappy() {
 
 #ifdef Q4B_ENABLE_STB
 #define STB_DEFINE
-#include <deprecated/stb.h>
+#include <deprecated/stb_compress.h>
 
 namespace q4b {
 
 uint64_t CompressionSchemeFunctions_Stb::GetMaxSize() const {
-	//TODO: real limit is 4GB?
-	return INT64_MAX;
+	// The format itself allows 64-bit sizes, but the reference implementation takes a 32-bit int
+	return UINT32_MAX;
 }
 
 uint64_t CompressionSchemeFunctions_Stb::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept {
-	uint64_t compressedBufSize = uncompressedSize + 512 + (uncompressedSize >> 2); // Size from stb_compress_tofile()/stb_compress_intofile(), which is a "total guess"
-	*outputData = new char[compressedBufSize];
-	stb_uint compressedSize = stb_compress((unsigned char*)(*outputData), (unsigned char*)inputData, uncompressedSize); // Note: inputData isn't const...
-	return compressedSize;
+	// Only outputs frames
+	return Compress_GenericExport(clevel, flags, inputData, uncompressedSize, outputData);
 }
 
 uint64_t CompressionSchemeFunctions_Stb::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept {
-	// No frame format or other metadata
-	return Compress(clevel, flags, inputData, uncompressedSize, outputData);
+	// Size from binary_to_compressed_c() in Imgui misc/fonts/binary_to_compressed_c.cpp,
+	// which is almost identical to stb_compress_tofile()/stb_compress_intofile(),
+	// which is a "total guess". stb_compress is deprecated for a reason.
+	uint64_t compressedBufSize = uncompressedSize + 512 + (uncompressedSize >> 2) + sizeof(int);
+	*outputData = new char[compressedBufSize];
+	stb_uint compressedSize = stb_compress((unsigned char*)(*outputData), (const unsigned char*)inputData, uncompressedSize);
+	return compressedSize;
 }
 
 uint64_t CompressionSchemeFunctions_Stb::Decompress(const char* inputData, uint64_t compressedSize, char** outputData, uint64_t originalSize) const noexcept {
+	if (compressedSize < 16) [[unlikely]] {
+		// Too small for header
+		return 0;
+	}
 	*outputData = new char[originalSize];
-	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (unsigned char*)inputData, compressedSize);
+	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (const unsigned char*)inputData, compressedSize);
 	return decompressedSize;
 }
 
 uint64_t CompressionSchemeFunctions_Stb::Decompress_UnknownSize(const char* inputData, uint64_t compressedSize, char** outputData) const noexcept {
-	stb_uint decompressedBufSize = stb_decompress_length((unsigned char*)inputData) + 1; // Size from stb_decompress_fromfile()
+	if (compressedSize < 16) [[unlikely]] {
+		// Too small for header
+		return 0;
+	}
+	stb_uint decompressedBufSize = stb_decompress_length((const unsigned char*)inputData);
 	*outputData = new char[decompressedBufSize];
-	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (unsigned char*)inputData, compressedSize);
+	stb_uint decompressedSize = stb_decompress((unsigned char*)(*outputData), (const unsigned char*)inputData, compressedSize);
 	return decompressedSize;
 }
 

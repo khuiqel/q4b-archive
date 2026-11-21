@@ -25,6 +25,6 @@
 [submodule "Externals/snappy"]
 	path = Externals/snappy
 	url = https://github.com/google/snappy.git
-[submodule "Externals/stb"]
-	path = Externals/stb
-	url = https://github.com/nothings/stb.git
+[submodule "Externals/stb_compress"]
+	path = Externals/stb_compress
+	url = https://github.com/khuiqel/stb.git
