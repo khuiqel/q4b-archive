@@ -103,9 +103,9 @@ uint64_t CompressionSchemeFunctions_Lz4::Decompress_UnknownSize(const char* inpu
 CompressionSchemeFunctions_Lz4::~CompressionSchemeFunctions_Lz4() {
 	//TODO: free cctx
 }
-#endif
 
 } // namespace q4b
+#endif
 
 #ifdef Q4B_ENABLE_ZSTD
 #define ZSTD_STATIC_LINKING_ONLY
@@ -198,9 +198,9 @@ uint64_t CompressionSchemeFunctions_Zstd::Decompress_UnknownSize(const char* inp
 CompressionSchemeFunctions_Zstd::~CompressionSchemeFunctions_Zstd() {
 	//TODO: free cctx
 }
-#endif
 
 } // namespace q4b
+#endif
 
 #ifdef Q4B_ENABLE_BROTLI
 #include <brotli/encode.h>
@@ -242,9 +242,9 @@ uint64_t CompressionSchemeFunctions_Brotli::Decompress_UnknownSize(const char* i
 CompressionSchemeFunctions_Brotli::~CompressionSchemeFunctions_Brotli() {
 	//TODO?
 }
-#endif
 
 } // namespace q4b
+#endif
 
 #ifdef Q4B_ENABLE_SNAPPY
 #include <snappy.h>
@@ -285,9 +285,9 @@ uint64_t CompressionSchemeFunctions_Snappy::Decompress_UnknownSize(const char* i
 CompressionSchemeFunctions_Snappy::~CompressionSchemeFunctions_Snappy() {
 	//TODO?
 }
-#endif
 
 } // namespace q4b
+#endif
 
 #ifdef Q4B_ENABLE_ZLIB
 #include <zlib-ng.h>
@@ -342,9 +342,9 @@ uint64_t CompressionSchemeFunctions_Zlib::Decompress_UnknownSize(const char* inp
 CompressionSchemeFunctions_Zlib::~CompressionSchemeFunctions_Zlib() {
 	//TODO?
 }
-#endif
 
 } // namespace q4b
+#endif
 
 #ifdef Q4B_ENABLE_STB
 #define STB_DEFINE
@@ -396,6 +396,6 @@ uint64_t CompressionSchemeFunctions_Stb::Decompress_UnknownSize(const char* inpu
 CompressionSchemeFunctions_Stb::~CompressionSchemeFunctions_Stb() {
 	//TODO?
 }
-#endif
 
 } // namespace q4b
+#endif
