@@ -162,25 +162,25 @@ struct CompressionSchemeInfo_Snappy final : public CompressionSchemeInfo {
 };
 #endif
 
-/*
+#ifdef Q4B_ENABLE_ZLIB
 struct CompressionSchemeInfo_Zlib final : public CompressionSchemeInfo {
 	CompressionSchemeInfo_Zlib() {
 		scheme = q4b::CompressionScheme::zlib;
 		isDictionaryScheme = false;
-		usableForGenericExport = false; // TODO
+		usableForGenericExport = false;
 
 		recommendation = CompressionSchemeRecommendedLevel::Okay;
 		displayName = "zlib";
 		informationText = "An old compression scheme. There are better options. Not to be confused with Zstd.\n\n"
-		                  "This particular program implements the zlib data format using miniz.";
+		                  "This particular program implements the zlib data format using zlib-ng.";
 
-		helpText = "TODO";
+		helpText = "clevels: 0-9";
 		searchNames = { "zlib", "zlib-ng", "miniz" };
-		fileExtensions = {}; //TODO
+		fileExtensions = { ".zlib" };
 	}
 	void Initialize_Gui() override;
 };
-*/
+#endif
 
 #ifdef Q4B_ENABLE_STB
 struct CompressionSchemeInfo_Stb final : public CompressionSchemeInfo {

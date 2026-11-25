@@ -61,6 +61,9 @@ constexpr CompressionScheme LIST_OF_ENABLED_SCHEMES[] = {
 	#ifdef Q4B_ENABLE_SNAPPY
 	CompressionScheme::snappy,
 	#endif
+	#ifdef Q4B_ENABLE_ZLIB
+	CompressionScheme::zlib,
+	#endif
 	#ifdef Q4B_ENABLE_STB
 	CompressionScheme::stb,
 	#endif

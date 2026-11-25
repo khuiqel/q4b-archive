@@ -128,6 +128,35 @@ void CompressionSchemeInfo_Snappy::Initialize_Gui() {
 } // namespace q4b
 #endif
 
+#ifdef Q4B_ENABLE_ZLIB
+#include <zlib-ng.h>
+namespace q4b {
+void CompressionSchemeInfo_Zlib::Initialize_Gui() {
+	clevel_str.reserve((Z_BEST_COMPRESSION - Z_BEST_SPEED) + 2);
+	clevel_val.reserve((Z_BEST_COMPRESSION - Z_BEST_SPEED) + 2);
+
+	const char* level = "0 (uncompressed)";
+	char* level_str = new char[sizeof("0 (uncompressed)")+1];
+	std::copy(level, level+sizeof("0 (uncompressed)"), level_str);
+	clevel_str.push_back(level_str);
+	clevel_val.push_back(Z_NO_COMPRESSION);
+
+	for (int i = Z_BEST_SPEED; i <= Z_BEST_COMPRESSION; i++) {
+		std::string level = std::to_string(i);
+		if (i == 6) { // Z_DEFAULT_COMPRESSION from deflateParams() and zng_deflateInit()
+			level += " (default)";
+			clevel_default_idx = clevel_val.size();
+		}
+		char* level_str = new char[level.size()+1];
+		std::copy(level.begin(), level.end(), level_str);
+		level_str[level.size()] = '\0';
+		clevel_str.push_back(level_str);
+		clevel_val.push_back(i);
+	}
+}
+} // namespace q4b
+#endif
+
 #ifdef Q4B_ENABLE_STB
 namespace q4b {
 void CompressionSchemeInfo_Stb::Initialize_Gui() {

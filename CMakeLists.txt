@@ -9,6 +9,7 @@ option(Q4B_ENABLE_LZ4    "Enable LZ4 compression and decompression" ON)
 option(Q4B_ENABLE_ZSTD   "Enable Zstandard compression and decompression" ON)
 option(Q4B_ENABLE_BROTLI "Enable Brotli compression and decompression" ON)
 option(Q4B_ENABLE_SNAPPY "Enable Snappy compression and decompression" ON)
+option(Q4B_ENABLE_ZLIB   "Enable zlib compression and decompression" ON)
 option(Q4B_ENABLE_STB    "Enable stb_compress compression and decompression" ON)
 set(Q4B_SCHEME_LIBS)
 
@@ -31,6 +32,7 @@ endif()
 
 # Global CMake configuration
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE) # enable_testing() doesn't care about this setting
 
 # General compiler flags
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -165,6 +167,19 @@ if(Q4B_ENABLE_SNAPPY)
 	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_SNAPPY)
 endif()
 
+if(Q4B_ENABLE_ZLIB)
+	set(ZLIB_COMPAT OFF CACHE BOOL "" FORCE) # Default
+	set(ZLIB_ALIASES OFF CACHE BOOL "" FORCE)
+	set(WITH_GZFILEOP OFF CACHE BOOL "" FORCE)
+	set(WITH_GTEST OFF CACHE BOOL "" FORCE)
+	set(WITH_BENCHMARKS OFF CACHE BOOL "" FORCE) # Default
+	set(INSTALL_UTILS OFF CACHE BOOL "" FORCE) # Default
+
+	add_subdirectory(Externals/zlib-ng EXCLUDE_FROM_ALL)
+	list(APPEND Q4B_SCHEME_LIBS zlib-ng-static)
+	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_ZLIB)
+endif()
+
 if(Q4B_ENABLE_STB)
 	target_include_directories(${PROJECT_LIB_NAME} PRIVATE Externals/stb_compress)
 	target_compile_definitions(${PROJECT_LIB_NAME} PUBLIC Q4B_ENABLE_STB)
@@ -177,6 +192,7 @@ find_package(lz4 1.8.0 REQUIRED)
 find_package(zstd 1.5.0 REQUIRED)
 find_package(brotli 1.1.1 REQUIRED)
 find_package(snappy 1.2.1 REQUIRED)
+find_package(zlib-ng 2.3.2 REQUIRED)
 #]]
 
 ### Projects ###

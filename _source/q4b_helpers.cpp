@@ -23,6 +23,9 @@ CompressionSchemeInfo* SCHEME_INFO[] = {
 	#ifdef Q4B_ENABLE_SNAPPY
 	new CompressionSchemeInfo_Snappy(),
 	#endif
+	#ifdef Q4B_ENABLE_ZLIB
+	new CompressionSchemeInfo_Zlib(),
+	#endif
 	#ifdef Q4B_ENABLE_STB
 	new CompressionSchemeInfo_Stb(),
 	#endif
@@ -53,6 +56,11 @@ CompressionSchemeFunctions* SchemeToFunctions(CompressionScheme scheme) {
 		#ifdef Q4B_ENABLE_SNAPPY
 		case q4b::CompressionScheme::snappy:
 			return new CompressionSchemeFunctions_Snappy();
+		#endif
+
+		#ifdef Q4B_ENABLE_ZLIB
+		case q4b::CompressionScheme::zlib:
+			return new CompressionSchemeFunctions_Zlib();
 		#endif
 
 		#ifdef Q4B_ENABLE_STB

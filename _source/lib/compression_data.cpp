@@ -289,6 +289,63 @@ CompressionSchemeFunctions_Snappy::~CompressionSchemeFunctions_Snappy() {
 
 } // namespace q4b
 
+#ifdef Q4B_ENABLE_ZLIB
+#include <zlib-ng.h>
+
+namespace q4b {
+
+uint64_t CompressionSchemeFunctions_Zlib::GetMaxSize() const {
+	//TODO
+	return INT64_MAX;
+}
+
+uint64_t CompressionSchemeFunctions_Zlib::Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept {
+	size_t compressedBufSize = zng_compressBound(uncompressedSize);
+	*outputData = new char[compressedBufSize];
+	int32_t ret = zng_compress2((uint8_t*)*outputData, &compressedBufSize, (const uint8_t*)inputData, uncompressedSize, clevel);
+	if (ret != Z_OK) {
+		//TODO
+		delete[] *outputData;
+		return 0;
+	}
+	return compressedBufSize;
+}
+
+uint64_t CompressionSchemeFunctions_Zlib::Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept {
+	return Compress(clevel, flags, inputData, uncompressedSize, outputData);
+}
+
+uint64_t CompressionSchemeFunctions_Zlib::Decompress(const char* inputData, uint64_t compressedSize, char** outputData, uint64_t originalSize) const noexcept {
+	*outputData = new char[originalSize];
+	size_t destLen = originalSize;
+	int32_t ret = zng_uncompress((uint8_t*)*outputData, &destLen, (const uint8_t*)inputData, compressedSize);
+	if (ret != Z_OK) {
+		//TODO
+		delete[] *outputData;
+		return 0;
+	}
+	return destLen;
+}
+
+uint64_t CompressionSchemeFunctions_Zlib::Decompress_UnknownSize(const char* inputData, uint64_t compressedSize, char** outputData) const noexcept {
+	*outputData = new char[compressedSize * 10]; // TODO
+	size_t destLen = compressedSize * 10;
+	int32_t ret = zng_uncompress((uint8_t*)*outputData, &destLen, (const uint8_t*)inputData, compressedSize);
+	if (ret != Z_OK) {
+		//TODO
+		delete[] *outputData;
+		return 0;
+	}
+	return destLen;
+}
+
+CompressionSchemeFunctions_Zlib::~CompressionSchemeFunctions_Zlib() {
+	//TODO?
+}
+#endif
+
+} // namespace q4b
+
 #ifdef Q4B_ENABLE_STB
 #define STB_DEFINE
 #include <deprecated/stb_compress.h>

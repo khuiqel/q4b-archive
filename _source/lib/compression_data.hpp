@@ -71,6 +71,17 @@ struct CompressionSchemeFunctions_Snappy final : public CompressionSchemeFunctio
 };
 #endif
 
+#ifdef Q4B_ENABLE_ZLIB
+struct CompressionSchemeFunctions_Zlib final : public CompressionSchemeFunctions {
+	uint64_t GetMaxSize() const override;
+	uint64_t Compress(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept override;
+	uint64_t Compress_GenericExport(int clevel, q4b::Q4B_CompressionFileFlags flags, const char* inputData, uint64_t uncompressedSize, char** outputData) const noexcept override;
+	uint64_t Decompress(const char* inputData, uint64_t compressedSize, char** outputData, uint64_t originalSize) const noexcept override;
+	uint64_t Decompress_UnknownSize(const char* inputData, uint64_t compressedSize, char** outputData) const noexcept override;
+	~CompressionSchemeFunctions_Zlib();
+};
+#endif
+
 #ifdef Q4B_ENABLE_STB
 struct CompressionSchemeFunctions_Stb final : public CompressionSchemeFunctions {
 	uint64_t GetMaxSize() const override;
