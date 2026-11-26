@@ -121,8 +121,13 @@ if(Q4B_ENABLE_GUI)
 endif()
 
 if(Q4B_ENABLE_LZ4)
-	set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
-	set(LZ4_BUNDLED_MODE ON CACHE BOOL "" FORCE)
+	# LZ4_JCC_ERRATUM improves performance of Intel Skylake CPUs
+	# by 10-30% at the cost of a few KB. May as well disable by default.
+	if(NOT DEFINED LZ4_JCC_ERRATUM)
+		set(LZ4_JCC_ERRATUM OFF CACHE BOOL "")
+	endif()
+	set(LZ4_BUILD_MULTITHREAD ON CACHE BOOL "" FORCE)
+	set(LZ4_STATIC_MULTITHREAD ON CACHE BOOL "" FORCE)
 
 	add_subdirectory(Externals/lz4/build/cmake EXCLUDE_FROM_ALL)
 	list(APPEND Q4B_SCHEME_LIBS lz4_static)

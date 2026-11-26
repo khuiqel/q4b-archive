@@ -20,6 +20,7 @@ static uint64_t CompressionFunction_Lz4(int clevel, q4b::Q4B_CompressionFileFlag
 		// Setup
 		LZ4F_preferences_t prefs = {}; // LZ4F_INIT_PREFERENCES will set to the defaults, but 0 is also interpreted as default
 		prefs.compressionLevel = clevel;
+		prefs.nbWorkers = 1; //TODO
 
 		if constexpr (GenericExport) {
 			prefs.frameInfo.contentSize = uncompressedSize; // This writes 8 extra bytes
