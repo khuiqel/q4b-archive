@@ -15,7 +15,7 @@ set(Q4B_SCHEME_LIBS)
 
 option(Q4B_BUILD_TESTS    "Build tests" ON)
 option(Q4B_ADVANCED_TESTS "Enable advanced tests" OFF) # Currently only adds testing zstd --max
-option(Q4B_ENABLE_GUI     "Enables building the GUI" ON)
+option(Q4B_ENABLE_GUI     "Build the GUI" ON)
 
 set(CMAKE_CXX_STANDARD 23) # C++23 requires CMake 3.20
 set(CMAKE_CXX_STANDARD_REQUIRED False)

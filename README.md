@@ -1,8 +1,8 @@
-# Q4B (very WIP)
+# Q4B
 
-A shoddy imitation of [PH3's P3A archive format](https://ph3at.github.io/posts/Asset-Compression/); it's a data compression tool.
+An imitation of [PH3's P3A archive format](https://ph3at.github.io/posts/Asset-Compression/); it's a data compression tool.
 
-You can also use this as a simple GUI for quickly compressing various files in the supported compression formats. There is also a CLI tool.
+You can also use this as a simple GUI for quickly compressing/decompressing various files in the supported compression formats. There is also a CLI tool, a benchmark script, and a library to make your own GUI/CLI/whatever.
 
 As P3A is closed-source (with the file format's header [open source](https://github.com/ph3at/p3a-format/)), I wanted to make my own version. As I do not have a large project to integrate this into, its quality is probably at least an order of magnitude below P3A. But I'm not claiming this is better; it's merely an open-source experiment. Without integrating this into a large project, it's basically just a GUI for compressing files...
 
@@ -20,6 +20,7 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 * [Zstandard](https://github.com/meta/zstd)
 * [Brotli](https://github.com/google/brotli)
 * [Snappy](https://github.com/google/snappy)
+* [zlib](https://github.com/madler/zlib)
 * [stb_compress](https://github.com/nothings/stb/blob/master/deprecated/stb.h)
 
 ## Building
@@ -36,12 +37,12 @@ Q4B is under active development. Do not use it for anything serious. Who knows w
 ### CMake options
 
 | Option | Default | Explanation | Notes |
-| ------ | ----------- | ------- | ----- |
+| -------------------- | --- | --- | --- |
 | `Q4B_BUILD_TESTS`    | ON  | Build the tests | |
 | `Q4B_ADVANCED_TESTS` | OFF | Enable advanced tests | Currently only adds testing `zstd --max` |
-| `Q4B_ENABLE_GUI`     | ON  | Enables building the GUI | |
+| `Q4B_ENABLE_GUI`     | ON  | Build the GUI | |
 
-Scheme options (all default ON): `Q4B_ENABLE_LZ4`, `Q4B_ENABLE_ZSTD`, `Q4B_ENABLE_BROTLI`, `Q4B_ENABLE_SNAPPY`, `Q4B_ENABLE_STB`
+Scheme options (all default ON): `Q4B_ENABLE_LZ4`, `Q4B_ENABLE_ZSTD`, `Q4B_ENABLE_BROTLI`, `Q4B_ENABLE_SNAPPY`, `Q4B_ENABLE_ZLIB`, `Q4B_ENABLE_STB`
 
 ### Linux
 
@@ -105,9 +106,26 @@ The benchmark utility is a Python script, so just run it. It requires the CLI pr
 * `formats` is pairs of schemes and levels. Examples: `lz4 9 zstd 3-19 brotli 0,11 snappy 1 stb 0`
 * Specify `-p` as one of `print csv plot` for how to output the data, and `-pout` for the output filename. Plots require matplotlib (TODO).
 
+## Currently working features
+
+GUI:
+
+* archive
+* unpack
+* inspect
+* bulk compression
+
+CLI:
+
+* archive
+* unpack
+* inspect
+* single file compression
+* single file decompression
+
 ## Big features remaining
 
-* offset in archive
+* bulk decompression
 * dictionary compression
 * error handling
 
@@ -143,6 +161,7 @@ GNU General Public License v3.0
 * [Zstandard](https://github.com/meta/zstd): BSD-3-Clause or GPLv2
 * [Brotli](https://github.com/google/brotli): MIT
 * [Snappy](https://github.com/google/snappy): BSD-3-Clause
+* [zlib-ng](https://github.com/zlib-ng/zlib-ng): zlib
 * [stb_compress](https://github.com/khuiqel/stb/blob/master/deprecated/stb.h): MIT or The Unlicense
 * [Noto Sans](https://notofonts.github.io/): [SIL OFL 1.1](https://openfontlicense.org/open-font-license-official-text/)
 
