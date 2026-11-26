@@ -18,7 +18,7 @@
 	url = https://github.com/lz4/lz4.git
 [submodule "Externals/zstd"]
 	path = Externals/zstd
-	url = https://github.com/facebook/zstd.git
+	url = https://github.com/meta/zstd.git
 [submodule "Externals/brotli"]
 	path = Externals/brotli
 	url = https://github.com/google/brotli.git

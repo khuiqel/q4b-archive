@@ -41,7 +41,7 @@ enum class CompressionScheme : uint32_t {
 	bzip2,
 	gzip,
 	stb,
-	//OpenZL, //https://github.com/facebook/openzl
+	//OpenZL, //https://github.com/meta/openzl
 	CountExtraEnd,
 
 	Invalid = 0xFFFFFFFF
