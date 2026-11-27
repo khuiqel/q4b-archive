@@ -237,7 +237,7 @@ add_executable(${PROJECT_GUI_NAME}
 
 # Executable icon:
 if(WIN32)
-	target_sources(${PROJECT_GUI_NAME} PRIVATE ${PROJECT_NAME}.rc)
+	target_sources(${PROJECT_GUI_NAME} PRIVATE _source/gui/${PROJECT_NAME}.rc)
 endif()
 # Visual Studio startup project:
 if(Q4B_ENABLE_GUI)
